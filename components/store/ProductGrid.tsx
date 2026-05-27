@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { ProductCard } from "./ProductCard";
+import { useWishlist } from "@/hooks/useWishlist";
 
 interface Product {
   id: string;
@@ -19,7 +23,24 @@ interface ProductGridProps {
   emptyMessage?: string;
 }
 
-export function ProductGrid({ products, wishlistIds = [], emptyMessage = "No products found." }: ProductGridProps) {
+export function ProductGrid({ products, wishlistIds: initialIds = [], emptyMessage = "No products found." }: ProductGridProps) {
+  const [wishlistIds, setWishlistIds] = useState<string[]>(initialIds);
+  const { toggle } = useWishlist();
+
+  useEffect(() => {
+    fetch("/api/wishlist")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((ids: string[]) => { if (Array.isArray(ids)) setWishlistIds(ids); })
+      .catch(() => {});
+  }, []);
+
+  const handleToggle = (productId: string, productName?: string) => {
+    setWishlistIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+    toggle(productId, productName);
+  };
+
   if (products.length === 0) {
     return (
       <div className="text-center py-20 text-(--color-text-muted)">
@@ -38,7 +59,7 @@ export function ProductGrid({ products, wishlistIds = [], emptyMessage = "No pro
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} wishlistIds={wishlistIds} />
+        <ProductCard key={product.id} product={product} wishlistIds={wishlistIds} onWishlistToggle={handleToggle} />
       ))}
     </div>
   );

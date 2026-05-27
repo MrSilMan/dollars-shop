@@ -1,11 +1,13 @@
-﻿"use client";
+"use client";
 
+import type { ReactNode } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
 import { createProduct, updateProduct } from "@/actions/products";
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus } from "lucide-react";
 
 interface Category { id: string; name: string; }
 interface ProductFormProps {
@@ -14,10 +16,57 @@ interface ProductFormProps {
   productId?: string;
 }
 
+function slugify(str: string) {
+  return str.toLowerCase().trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked ? "true" : "false"}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-primary) ${checked ? "bg-(--color-primary)" : "bg-(--color-border)"}`}
+    >
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+function Card({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={`bg-white rounded-2xl border border-(--color-border) p-5 ${className}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-(--color-text-muted) mb-4">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1 text-xs text-red-500">
+      <AlertCircle size={11} />{message}
+    </p>
+  );
+}
+
 export function ProductForm({ categories, defaultValues, productId }: ProductFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [images, setImages]               = useState<string[]>(defaultValues?.images ?? []);
+  const [uploadingCount, setUploading]    = useState(0);
+  const [dragOver, setDragOver]           = useState(false);
+  const [slugEdited, setSlugEdited]       = useState(false);
+  const [imageTab, setImageTab]           = useState<"upload" | "url">("upload");
+  const [urlInput, setUrlInput]           = useState("");
+  const fileInputRef                       = useRef<HTMLInputElement>(null);
+  const router                             = useRouter();
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(ProductSchema) as Resolver<ProductFormData>,
@@ -32,13 +81,67 @@ export function ProductForm({ categories, defaultValues, productId }: ProductFor
     },
   });
 
+  const { formState: { errors }, watch, register, setValue, handleSubmit } = form;
+  const isActive  = watch("isActive");
+  const isFeatured = watch("featured");
+
+  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!arr.length) return;
+    setUploading(c => c + arr.length);
+    try {
+      const urls = await Promise.all(
+        arr.map(async f => {
+          const fd = new FormData();
+          fd.append("file", f);
+          const res = await fetch("/api/upload", { method: "POST", body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          return data.url as string;
+        })
+      );
+      setImages(prev => {
+        const next = [...prev, ...urls];
+        setValue("images", next);
+        return next;
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Image upload failed");
+    } finally {
+      setUploading(c => c - arr.length);
+    }
+  }, [setValue]);
+
+  const removeImage = (url: string) => {
+    setImages(prev => {
+      const next = prev.filter(u => u !== url);
+      setValue("images", next);
+      return next;
+    });
+  };
+
+  const addImageUrl = () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed || images.includes(trimmed)) return;
+    try { new URL(trimmed); } catch { setError("Invalid URL"); return; }
+    setImages(prev => {
+      const next = [...prev, trimmed];
+      setValue("images", next);
+      return next;
+    });
+    setUrlInput("");
+  };
+
+  const nameReg = register("name");
+  const slugReg = register("slug");
+
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true);
     setError(null);
     try {
       const result = productId
-        ? await updateProduct(productId, data)
-        : await createProduct(data);
+        ? await updateProduct(productId, { ...data, images })
+        : await createProduct({ ...data, images });
 
       if (result && "error" in result) {
         setError(result.error ?? "An error occurred");
@@ -53,98 +156,300 @@ export function ProductForm({ categories, defaultValues, productId }: ProductFor
     }
   };
 
-  const inputCls = "w-full px-4 py-2.5 border border-(--color-border) rounded-xl text-sm outline-none focus:border-(--color-primary) transition-colors";
+  const input = "w-full px-3.5 py-2.5 border border-(--color-border) rounded-xl text-sm outline-none focus:border-(--color-primary) focus:ring-2 focus:ring-(--color-primary)/10 transition-colors bg-white placeholder:text-(--color-text-muted)";
+  const label = "block text-sm font-medium mb-1.5";
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 max-w-2xl">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium">Product Name</label>
-          <input {...form.register("name")} className={inputCls} placeholder="Product name" />
-          {form.formState.errors.name && <p className="text-xs text-(--color-primary)">{form.formState.errors.name.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_268px] gap-5 items-start">
+
+        {/* ── LEFT COLUMN ── */}
+        <div className="space-y-5">
+
+          {/* Images */}
+          <Card title="Product Images">
+            {/* Tabs */}
+            <div className="mb-4 flex gap-1 rounded-xl bg-(--color-surface-alt) p-1">
+              <button
+                type="button"
+                onClick={() => setImageTab("upload")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${imageTab === "upload" ? "bg-white shadow-sm text-(--color-text-primary)" : "text-(--color-text-muted) hover:text-(--color-text-primary)"}`}
+              >
+                <ImagePlus size={13} /> Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageTab("url")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${imageTab === "url" ? "bg-white shadow-sm text-(--color-text-primary)" : "text-(--color-text-muted) hover:text-(--color-text-primary)"}`}
+              >
+                <Link2 size={13} /> Use URL
+              </button>
+            </div>
+
+            {imageTab === "upload" ? (
+              <>
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); uploadFiles(e.dataTransfer.files); }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 cursor-pointer select-none transition-colors ${dragOver ? "border-(--color-primary) bg-(--color-primary-light)" : "border-(--color-border) hover:border-primary/40 hover:bg-(--color-surface-alt)"}`}
+                >
+                  {uploadingCount > 0 ? (
+                    <>
+                      <Loader2 size={28} className="animate-spin text-(--color-primary)" />
+                      <p className="text-sm text-(--color-text-muted)">
+                        Uploading {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--color-surface-alt) border border-(--color-border)">
+                        <ImagePlus size={22} className="text-(--color-text-muted)" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-(--color-text-primary)">
+                          Drop images here or <span className="text-(--color-primary) underline underline-offset-2">browse</span>
+                        </p>
+                        <p className="mt-0.5 text-xs text-(--color-text-muted)">JPEG · PNG · WebP · GIF &nbsp;·&nbsp; Max 5 MB each</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  aria-label="Upload product images"
+                  className="hidden"
+                  onChange={e => e.target.files && uploadFiles(e.target.files)}
+                />
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addImageUrl())}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-3.5 py-2.5 border border-(--color-border) rounded-xl text-sm outline-none focus:border-(--color-primary) focus:ring-2 focus:ring-primary/10 transition-colors bg-white placeholder:text-(--color-text-muted)"
+                />
+                <button
+                  type="button"
+                  onClick={addImageUrl}
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl bg-(--color-primary) px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-dark)"
+                >
+                  <Plus size={15} /> Add
+                </button>
+              </div>
+            )}
+
+            {images.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-3">
+                {images.map((url, i) => (
+                  <div key={url} className="group relative h-24 w-24 overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface-alt)">
+                    {i === 0 && (
+                      <span className="absolute left-1.5 top-1.5 z-10 rounded bg-(--color-primary) px-1.5 py-0.5 text-[9px] font-bold uppercase text-white tracking-wide">
+                        Cover
+                      </span>
+                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      onClick={e => { e.stopPropagation(); removeImage(url); }}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100"
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Basic Info */}
+          <Card title="Basic Information">
+            <div className="space-y-4">
+              <div>
+                <label className={label}>Product Name</label>
+                <input
+                  {...nameReg}
+                  onChange={e => {
+                    nameReg.onChange(e);
+                    if (!slugEdited) setValue("slug", slugify(e.target.value));
+                  }}
+                  className={input}
+                  placeholder="e.g. Dettol Antiseptic Liquid 500ml"
+                />
+                <FieldError message={errors.name?.message} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={label}>
+                    Slug <span className="text-(--color-text-muted) font-normal text-xs">— used in URL</span>
+                  </label>
+                  <input
+                    {...slugReg}
+                    onChange={e => { slugReg.onChange(e); setSlugEdited(true); }}
+                    className={input}
+                    placeholder="dettol-antiseptic-500ml"
+                  />
+                  <FieldError message={errors.slug?.message} />
+                </div>
+                <div>
+                  <label className={label}>Category</label>
+                  <select {...register("categoryId")} className={`${input} cursor-pointer`}>
+                    <option value="">Select category…</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <FieldError message={errors.categoryId?.message} />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Details */}
+          <Card title="Details">
+            <div className="space-y-4">
+              <div>
+                <label className={label}>Description</label>
+                <textarea
+                  {...register("description")}
+                  rows={4}
+                  className={`${input} resize-none`}
+                  placeholder="Describe the product — size, ingredients, uses…"
+                />
+                <FieldError message={errors.description?.message} />
+              </div>
+              <div>
+                <label className={label}>
+                  Tags <span className="text-(--color-text-muted) font-normal text-xs">— comma separated</span>
+                </label>
+                <input
+                  type="text"
+                  className={input}
+                  placeholder="cleaning, antiseptic, household"
+                  defaultValue={defaultValues?.tags?.join(", ")}
+                  onChange={e => setValue("tags", e.target.value.split(",").map(t => t.trim()).filter(Boolean))}
+                />
+              </div>
+            </div>
+          </Card>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Slug</label>
-          <input {...form.register("slug")} className={inputCls} placeholder="product-slug" />
-        </div>
+        {/* ── RIGHT SIDEBAR ── */}
+        <div className="space-y-5">
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">SKU</label>
-          <input {...form.register("sku")} className={inputCls} placeholder="HH-001" />
-        </div>
+          {/* Status */}
+          <Card title="Status">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Active</p>
+                  <p className="text-xs text-(--color-text-muted)">Visible in the store</p>
+                </div>
+                <Toggle checked={isActive} onChange={v => setValue("isActive", v)} label="Active" />
+              </div>
+              <div className="h-px bg-(--color-border)" />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Featured</p>
+                  <p className="text-xs text-(--color-text-muted)">Show on homepage</p>
+                </div>
+                <Toggle checked={isFeatured} onChange={v => setValue("featured", v)} label="Featured" />
+              </div>
+            </div>
+          </Card>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Price (USD)</label>
-          <input {...form.register("price", { valueAsNumber: true })} type="number" step="0.01" min="0" className={inputCls} placeholder="0.00" />
-        </div>
+          {/* Pricing */}
+          <Card title="Pricing">
+            <div className="space-y-3">
+              <div>
+                <label className={label}>
+                  Price <span className="text-(--color-text-muted) font-normal text-xs">USD</span>
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-(--color-text-muted)">$</span>
+                  <input
+                    {...register("price", { setValueAs: v => v === "" ? undefined : Number(v) })}
+                    type="number" step="0.01" min="0"
+                    className={`${input} pl-7`}
+                    placeholder="0.00"
+                  />
+                </div>
+                <FieldError message={errors.price?.message} />
+              </div>
+              <div>
+                <label className={label}>
+                  Compare At <span className="text-(--color-text-muted) font-normal text-xs">optional</span>
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-(--color-text-muted)">$</span>
+                  <input
+                    {...register("compareAtPrice", {
+                      setValueAs: v => (v === "" || v === null || v === undefined) ? undefined : Number(v),
+                    })}
+                    type="number" step="0.01" min="0"
+                    className={`${input} pl-7`}
+                    placeholder="0.00"
+                  />
+                </div>
+                <FieldError message={errors.compareAtPrice?.message} />
+              </div>
+            </div>
+          </Card>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Compare At Price (USD)</label>
-          <input {...form.register("compareAtPrice", { valueAsNumber: true, setValueAs: v => v === "" ? null : Number(v) })} type="number" step="0.01" min="0" className={inputCls} placeholder="0.00 (optional)" />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Stock</label>
-          <input {...form.register("stock", { valueAsNumber: true })} type="number" min="0" className={inputCls} />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Low Stock Alert</label>
-          <input {...form.register("lowStockAlert", { valueAsNumber: true })} type="number" min="0" className={inputCls} />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Category</label>
-          <select {...form.register("categoryId")} className={inputCls}>
-            <option value="">Select category…</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-
-        <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium">Description</label>
-          <textarea {...form.register("description")} rows={3} className={`${inputCls} resize-none`} placeholder="Product description…" />
-        </div>
-
-        <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium">Tags (comma separated)</label>
-          <input
-            type="text"
-            className={inputCls}
-            placeholder="cleaning, spray, household"
-            defaultValue={defaultValues?.tags?.join(", ")}
-            onChange={(e) => form.setValue("tags", e.target.value.split(",").map((t) => t.trim()).filter(Boolean))}
-          />
-        </div>
-
-        <div className="flex items-center gap-6">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input {...form.register("featured")} type="checkbox" className="w-4 h-4 accent-(--color-primary)" />
-            <span className="text-sm font-medium">Featured</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input {...form.register("isActive")} type="checkbox" className="w-4 h-4 accent-(--color-primary)" />
-            <span className="text-sm font-medium">Active</span>
-          </label>
+          {/* Inventory */}
+          <Card title="Inventory">
+            <div className="space-y-3">
+              <div>
+                <label className={label}>SKU</label>
+                <input {...register("sku")} className={input} placeholder="HH-001" />
+                <FieldError message={errors.sku?.message} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={label}>Stock</label>
+                  <input {...register("stock", { setValueAs: v => v === "" ? 0 : Number(v) })} type="number" min="0" className={input} />
+                </div>
+                <div>
+                  <label className={label}>Low Alert</label>
+                  <input {...register("lowStockAlert", { setValueAs: v => v === "" ? 0 : Number(v) })} type="number" min="0" className={input} />
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
 
-      {error && <p className="text-sm text-(--color-primary) bg-(--color-primary-light) px-4 py-2 rounded-lg">{error}</p>}
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <AlertCircle size={15} className="shrink-0" />
+          {error}
+        </div>
+      )}
 
-      <div className="flex gap-3 pt-2">
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-1">
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-5 py-2.5 border border-(--color-border) rounded-xl text-sm font-medium hover:bg-(--color-surface-alt) transition-colors"
+          className="rounded-xl border border-(--color-border) px-5 py-2.5 text-sm font-medium transition-colors hover:bg-(--color-surface-alt)"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 sm:flex-none bg-(--color-primary) hover:bg-(--color-primary-dark) disabled:opacity-60 text-white font-semibold px-8 py-2.5 rounded-xl transition-colors"
+          className="flex items-center gap-2 rounded-xl bg-(--color-primary) px-8 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-dark) disabled:opacity-60"
         >
+          {loading && <Loader2 size={15} className="animate-spin" />}
           {loading ? "Saving…" : productId ? "Update Product" : "Create Product"}
         </button>
       </div>

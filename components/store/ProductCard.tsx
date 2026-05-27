@@ -23,7 +23,7 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   wishlistIds?: string[];
-  onWishlistToggle?: (productId: string) => void;
+  onWishlistToggle?: (productId: string, productName?: string) => void;
 }
 
 export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: ProductCardProps) {
@@ -71,7 +71,7 @@ export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: Pro
         {/* Wishlist button — top-right, appears on hover */}
         <button
           type="button"
-          onClick={() => { startWish(() => { onWishlistToggle?.(product.id); }); }}
+          onClick={() => { startWish(() => { onWishlistToggle?.(product.id, product.name); }); }}
           disabled={wishPending}
           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center shadow-sm transition-all duration-150 ${

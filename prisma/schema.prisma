@@ -197,3 +197,63 @@ model Review {
   @@unique([userId, productId])
   @@map("reviews")
 }
+
+model HeroSlide {
+  id        String   @id @default(cuid())
+  tag       String
+  tagBg     String   @default("bg-white/20")
+  headline  String
+  sub       String
+  ctaLabel  String
+  ctaHref   String   @default("/shop")
+  imageUrl  String?
+  bgFrom    String   @default("#FF4400")
+  bgTo      String   @default("#E63900")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("hero_slides")
+}
+
+model SidePromo {
+  id        String   @id @default(cuid())
+  label     String
+  headline  String
+  href      String   @default("/shop")
+  imageUrl  String?
+  bgFrom    String   @default("#FF4400")
+  bgTo      String   @default("#E63900")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("side_promos")
+}
+
+model PromoCard {
+  id        String   @id @default(cuid())
+  amount    String
+  label     String
+  desc      String
+  sub       String
+  href      String   @default("/shop")
+  leftBg    String
+  rightBg   String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("promo_cards")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}

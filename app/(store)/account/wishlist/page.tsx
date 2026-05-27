@@ -17,7 +17,12 @@ export default async function WishlistPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const products = wishlistItems.map((w) => w.product);
+  const products = wishlistItems.map((w) => ({
+    ...w.product,
+    price: w.product.price.toNumber(),
+    compareAtPrice: w.product.compareAtPrice?.toNumber() ?? null,
+    weight: w.product.weight?.toNumber() ?? null,
+  }));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">

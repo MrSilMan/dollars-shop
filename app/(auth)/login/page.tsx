@@ -6,7 +6,8 @@ import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema, type LoginFormData } from "@/schemas/user.schema";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
+import { mergeGuestCart } from "@/actions/cart";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { Suspense } from "react";
@@ -29,7 +30,10 @@ function LoginContent() {
       setError("Invalid email or password");
       setLoading(false);
     } else {
-      router.push(callbackUrl);
+      await mergeGuestCart();
+      const session = await getSession();
+      const role = (session?.user as { role?: string })?.role;
+      router.push(role === "ADMIN" ? "/admin" : callbackUrl);
     }
   };
 

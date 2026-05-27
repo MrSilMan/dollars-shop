@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ShoppingBasket } from "lucide-react";
 import { categoryIconMap } from "@/lib/categories";
 
@@ -19,6 +19,13 @@ interface CategoryNavProps {
 
 export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" });
+  }, [activeSlug]);
 
   const scroll = useCallback((dir: "left" | "right") => {
     const el = scrollRef.current;
@@ -45,7 +52,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
         aria-label="Product categories"
         className="flex gap-2 overflow-x-auto scrollbar-none flex-1 -mx-1 px-1"
       >
-        <Link href="/shop" className={`${pillBase} ${!activeSlug ? pillActive : pillIdle}`}>
+        <Link href="/shop" data-active={!activeSlug || undefined} className={`${pillBase} ${!activeSlug ? pillActive : pillIdle}`}>
           All Products
         </Link>
         {categories.map((cat) => {
@@ -54,6 +61,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
             <Link
               key={cat.id}
               href={`/shop/${cat.slug}`}
+              data-active={activeSlug === cat.slug || undefined}
               className={`${pillBase} ${activeSlug === cat.slug ? pillActive : pillIdle}`}
             >
               <Icon size={13} aria-hidden="true" />

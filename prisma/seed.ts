@@ -2,11 +2,13 @@ import "dotenv/config";
 import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import Redis from "ioredis";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL ?? "postgresql://postgres:password@localhost:5432/dollar_shop",
 });
 const prisma = new PrismaClient({ adapter });
+const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true });
 
 async function main() {
   console.log("Seeding database...");
@@ -66,45 +68,60 @@ async function main() {
   }
   console.log(`Seeded ${categoryData.length} categories`);
 
+  // Clear all existing products before inserting the new catalogue
+  const allExistingProducts = await prisma.product.findMany({ select: { id: true } });
+  const allExistingIds = allExistingProducts.map((p) => p.id);
+  if (allExistingIds.length > 0) {
+    await prisma.cartItem.deleteMany({ where: { productId: { in: allExistingIds } } });
+    await prisma.wishlistItem.deleteMany({ where: { productId: { in: allExistingIds } } });
+    await prisma.review.deleteMany({ where: { productId: { in: allExistingIds } } });
+    await prisma.orderItem.deleteMany({ where: { productId: { in: allExistingIds } } });
+    await prisma.product.deleteMany();
+    console.log(`Cleared ${allExistingIds.length} existing products`);
+  }
+
   // Seed products
   const productData = [
-    // Daily Necessities (groceries, cleaning, personal care)
-    { name: "Multi-Surface Spray Cleaner 500ml", slug: "multi-surface-spray-cleaner-500ml", categorySlug: "daily-necessities", price: 1.50, compareAtPrice: 2.00, stock: 120, sku: "HH-001", description: "Effective on tiles, counters, and glass. Lemon fresh scent.", images: ["/images/products/placeholder.svg"], tags: ["cleaning", "spray", "household"], featured: true },
-    { name: "Dish Washing Liquid 750ml", slug: "dish-washing-liquid-750ml", categorySlug: "daily-necessities", price: 1.25, compareAtPrice: null, stock: 200, sku: "HH-002", description: "Tough on grease, gentle on hands. Long-lasting foam.", images: ["/images/products/placeholder.svg"], tags: ["dishes", "cleaning"], featured: false },
-    { name: "Roller Meal 2kg", slug: "roller-meal-2kg", categorySlug: "daily-necessities", price: 1.80, compareAtPrice: null, stock: 300, sku: "GR-001", description: "Finely milled maize meal. A Zimbabwean staple. Quick-cook.", images: ["/images/products/placeholder.svg"], tags: ["sadza", "maize", "staple"], featured: true },
-    { name: "Cooking Oil 2L", slug: "cooking-oil-2l", categorySlug: "daily-necessities", price: 3.50, compareAtPrice: 4.00, stock: 150, sku: "GR-002", description: "Sunflower cooking oil. Cholesterol-free. Ideal for frying and baking.", images: ["/images/products/placeholder.svg"], tags: ["oil", "cooking", "sunflower"], featured: false },
-    { name: "Sugar 1kg", slug: "sugar-1kg", categorySlug: "daily-necessities", price: 1.20, compareAtPrice: null, stock: 400, sku: "GR-003", description: "White granulated sugar. Essential for every kitchen.", images: ["/images/products/placeholder.svg"], tags: ["sugar", "baking"], featured: false },
-    { name: "Black Tea Bags (100 pack)", slug: "black-tea-bags-100pack", categorySlug: "daily-necessities", price: 2.00, compareAtPrice: 2.50, stock: 200, sku: "GR-004", description: "Rich Zimbabwean black tea. Bold flavour, perfect brew.", images: ["/images/products/placeholder.svg"], tags: ["tea", "beverages"], featured: true },
-    { name: "Salt 500g", slug: "salt-500g", categorySlug: "daily-necessities", price: 0.75, compareAtPrice: null, stock: 500, sku: "GR-005", description: "Iodised table salt. Essential seasoning for every meal.", images: ["/images/products/placeholder.svg"], tags: ["salt", "seasoning"], featured: false },
-    { name: "Petroleum Jelly 250ml", slug: "petroleum-jelly-250ml", categorySlug: "daily-necessities", price: 1.00, compareAtPrice: null, stock: 300, sku: "PC-001", description: "Multi-purpose skin protector. Soothes dry skin and lips.", images: ["/images/products/placeholder.svg"], tags: ["skincare", "moisturiser"], featured: false },
-    { name: "Antibacterial Soap Bar (3-Pack)", slug: "antibacterial-soap-3pack", categorySlug: "daily-necessities", price: 1.50, compareAtPrice: 2.00, stock: 500, sku: "PC-002", description: "Long-lasting protection. Fresh clean scent.", images: ["/images/products/placeholder.svg"], tags: ["soap", "hygiene", "antibacterial"], featured: true },
-    { name: "Shampoo 400ml", slug: "shampoo-400ml", categorySlug: "daily-necessities", price: 2.00, compareAtPrice: 2.75, stock: 180, sku: "PC-003", description: "Moisturising formula for all hair types. No sulfates.", images: ["/images/products/placeholder.svg"], tags: ["shampoo", "haircare"], featured: false },
-    { name: "Roll-On Deodorant 50ml", slug: "roll-on-deodorant-50ml", categorySlug: "daily-necessities", price: 1.75, compareAtPrice: null, stock: 220, sku: "PC-004", description: "48-hour protection. Light fresh fragrance.", images: ["/images/products/placeholder.svg"], tags: ["deodorant", "hygiene"], featured: false },
-    { name: "Toothpaste 75ml", slug: "toothpaste-75ml", categorySlug: "daily-necessities", price: 1.25, compareAtPrice: 1.75, stock: 350, sku: "PC-005", description: "Fluoride toothpaste for cavity protection and fresh breath.", images: ["/images/products/placeholder.svg"], tags: ["dental", "hygiene"], featured: false },
-    { name: "Assorted Biscuits 400g", slug: "assorted-biscuits-400g", categorySlug: "daily-necessities", price: 1.50, compareAtPrice: null, stock: 200, sku: "FS-001", description: "Cream-filled and plain varieties. Great for tea time.", images: ["/images/products/placeholder.svg"], tags: ["snacks", "biscuits"], featured: false },
-    { name: "Instant Noodles (5-Pack)", slug: "instant-noodles-5pack", categorySlug: "daily-necessities", price: 2.00, compareAtPrice: 2.50, stock: 300, sku: "FS-002", description: "Chicken and beef flavour options. Ready in 3 minutes.", images: ["/images/products/placeholder.svg"], tags: ["noodles", "instant", "quick-meal"], featured: true },
-    { name: "Peanut Butter 400g", slug: "peanut-butter-400g", categorySlug: "daily-necessities", price: 2.25, compareAtPrice: null, stock: 180, sku: "FS-003", description: "Creamy peanut butter. High in protein. No added sugar.", images: ["/images/products/placeholder.svg"], tags: ["peanut", "spread", "protein"], featured: false },
-    { name: "Drinking Chocolate 250g", slug: "drinking-chocolate-250g", categorySlug: "daily-necessities", price: 1.75, compareAtPrice: 2.25, stock: 200, sku: "FS-004", description: "Rich cocoa drinking chocolate. Perfect for cold mornings.", images: ["/images/products/placeholder.svg"], tags: ["chocolate", "beverage"], featured: false },
-    // Home Improvement
-    { name: "Broom & Dustpan Set", slug: "broom-dustpan-set", categorySlug: "home-improvement", price: 3.00, compareAtPrice: 4.50, stock: 60, sku: "HH-003", description: "Sturdy plastic broom with matching dustpan. Compact design.", images: ["/images/products/placeholder.svg"], tags: ["broom", "cleaning"], featured: true },
-    { name: "Mop & Bucket Set", slug: "mop-bucket-set", categorySlug: "home-improvement", price: 4.00, compareAtPrice: 5.50, stock: 45, sku: "HH-005", description: "Heavy duty mop with wringer bucket. Easy to use.", images: ["/images/products/placeholder.svg"], tags: ["cleaning", "mop"], featured: false },
     // School Stationery
-    { name: "Exercise Book A4 (10-Pack)", slug: "exercise-book-a4-10pack", categorySlug: "school-stationery", price: 2.50, compareAtPrice: 3.00, stock: 400, sku: "ST-001", description: "96-page ruled exercise books. Perfect for school use.", images: ["/images/products/placeholder.svg"], tags: ["school", "books", "writing"], featured: true },
-    { name: "Ballpoint Pens (12-Pack)", slug: "ballpoint-pens-12pack", categorySlug: "school-stationery", price: 1.50, compareAtPrice: null, stock: 600, sku: "ST-002", description: "Smooth blue ink. Medium tip. Great value multipack.", images: ["/images/products/placeholder.svg"], tags: ["pens", "writing"], featured: false },
-    { name: "Pencils HB (12-Pack)", slug: "pencils-hb-12pack", categorySlug: "school-stationery", price: 1.25, compareAtPrice: null, stock: 500, sku: "ST-003", description: "HB graphite pencils. Ideal for writing and drawing.", images: ["/images/products/placeholder.svg"], tags: ["pencils", "school"], featured: false },
+    { name: "Wax Crayons", slug: "wax-crayons", categorySlug: "school-stationery", price: 2.00, compareAtPrice: null, stock: 200, sku: "SS-001", description: "Vibrant wax crayons for drawing and colouring.", images: ["https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=600&q=80&auto=format&fit=crop"], tags: ["crayons", "art", "school"], featured: false },
+    { name: "Diary Notebook", slug: "diary-notebook", categorySlug: "school-stationery", price: 2.00, compareAtPrice: null, stock: 150, sku: "SS-002", description: "Lined diary notebook for daily writing and journalling.", images: ["https://images.unsplash.com/photo-1517971071642-34a2d3eaac27?w=600&q=80&auto=format&fit=crop"], tags: ["diary", "notebook", "school"], featured: false },
+    { name: "Happiness Diary", slug: "happiness-diary", categorySlug: "school-stationery", price: 2.00, compareAtPrice: null, stock: 100, sku: "SS-003", description: "A motivational diary to record your thoughts and happiness.", images: ["https://images.unsplash.com/photo-1455390582262-044cdead277a?w=600&q=80&auto=format&fit=crop"], tags: ["diary", "journal", "school"], featured: false },
+    // Hardware
+    { name: "All Size Spanners Set", slug: "all-size-spanners-set", categorySlug: "hardware", price: 10.00, compareAtPrice: null, stock: 50, sku: "HW-001", description: "Complete set of spanners in all standard sizes.", images: ["https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&q=80&auto=format&fit=crop"], tags: ["spanners", "tools", "hardware"], featured: true },
+    { name: "Paint Brush", slug: "paint-brush", categorySlug: "hardware", price: 2.00, compareAtPrice: null, stock: 120, sku: "HW-002", description: "Durable paint brush suitable for walls and surfaces.", images: ["https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600&q=80&auto=format&fit=crop"], tags: ["paint", "brush", "hardware"], featured: false },
+    { name: "Electric Tape", slug: "electric-tape", categorySlug: "hardware", price: 0.00, compareAtPrice: null, stock: 200, sku: "HW-003", description: "Insulating electric tape for wiring and cable management. Price on enquiry.", images: ["https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600&q=80&auto=format&fit=crop"], tags: ["tape", "electrical", "hardware"], featured: false },
     // Baby Necessities
-    { name: "Baby Wipes (80-pack)", slug: "baby-wipes-80pack", categorySlug: "baby-necessities", price: 1.75, compareAtPrice: 2.25, stock: 250, sku: "BK-001", description: "Gentle, alcohol-free wipes. Suitable from birth.", images: ["/images/products/placeholder.svg"], tags: ["baby", "wipes", "hygiene"], featured: true },
-    { name: "Diapers Size 3 (20-pack)", slug: "diapers-size-3-20pack", categorySlug: "baby-necessities", price: 4.50, compareAtPrice: 5.50, stock: 100, sku: "BK-002", description: "Super absorbent with wetness indicator. Soft inner lining.", images: ["/images/products/placeholder.svg"], tags: ["diapers", "baby"], featured: true },
-    { name: "Baby Powder 200g", slug: "baby-powder-200g", categorySlug: "baby-necessities", price: 1.50, compareAtPrice: null, stock: 200, sku: "BK-003", description: "Gentle talc-free baby powder. Keeps skin fresh and dry.", images: ["/images/products/placeholder.svg"], tags: ["baby", "powder", "skincare"], featured: false },
+    { name: "Sound Flashing Ball for Babies", slug: "sound-flashing-ball-for-babies", categorySlug: "baby-necessities", price: 1.50, compareAtPrice: null, stock: 80, sku: "BN-001", description: "Colourful ball with lights and sounds to stimulate baby senses.", images: ["https://images.unsplash.com/photo-1566933293069-b55c7f326dd4?w=600&q=80&auto=format&fit=crop"], tags: ["baby", "toy", "sensory"], featured: true },
+    { name: "Baby Soothers", slug: "baby-soothers", categorySlug: "baby-necessities", price: 2.00, compareAtPrice: null, stock: 150, sku: "BN-002", description: "Soft silicone soothers to comfort and calm your baby.", images: ["https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600&q=80&auto=format&fit=crop"], tags: ["baby", "soother", "dummy"], featured: false },
+    { name: "Rattle", slug: "rattle", categorySlug: "baby-necessities", price: 1.00, compareAtPrice: null, stock: 120, sku: "BN-003", description: "Lightweight baby rattle to encourage play and motor skills.", images: ["https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600&q=80&auto=format&fit=crop"], tags: ["baby", "rattle", "toy"], featured: false },
     // Electric Gadgets
-    { name: "AA Batteries (8-Pack)", slug: "aa-batteries-8pack", categorySlug: "electric-gadgets", price: 2.00, compareAtPrice: null, stock: 350, sku: "EL-001", description: "Long-lasting alkaline batteries for remotes, torches & more.", images: ["/images/products/placeholder.svg"], tags: ["batteries", "electronics"], featured: false },
-    { name: "USB-C Charging Cable 1m", slug: "usb-c-cable-1m", categorySlug: "electric-gadgets", price: 2.50, compareAtPrice: 3.50, stock: 200, sku: "EL-002", description: "Fast charge compatible. Braided nylon for durability.", images: ["/images/products/placeholder.svg"], tags: ["cable", "charging", "usb"], featured: true },
-    { name: "Phone Screen Protector", slug: "phone-screen-protector", categorySlug: "electric-gadgets", price: 1.50, compareAtPrice: null, stock: 300, sku: "EL-003", description: "Universal tempered glass screen protector. Easy to apply.", images: ["/images/products/placeholder.svg"], tags: ["phone", "protection"], featured: false },
+    { name: "Heavy Duty Electro Master Iron", slug: "heavy-duty-electro-master-iron", categorySlug: "electric-gadgets", price: 18.00, compareAtPrice: null, stock: 40, sku: "EG-001", description: "Powerful heavy-duty steam iron for wrinkle-free clothes.", images: ["https://images.unsplash.com/photo-1489274495757-95c7c837b101?w=600&q=80&auto=format&fit=crop"], tags: ["iron", "appliance", "electric"], featured: true },
+    { name: "Juice Blender 2 in 1", slug: "juice-blender-2in1", categorySlug: "electric-gadgets", price: 20.00, compareAtPrice: null, stock: 30, sku: "EG-002", description: "Versatile 2-in-1 blender and juicer for smoothies and fresh juice.", images: ["https://images.unsplash.com/photo-1536304447766-da0ed4ce1b73?w=600&q=80&auto=format&fit=crop"], tags: ["blender", "juicer", "appliance"], featured: true },
+    { name: "Garment Steamer", slug: "garment-steamer", categorySlug: "electric-gadgets", price: 9.80, compareAtPrice: null, stock: 35, sku: "EG-003", description: "Handheld garment steamer to remove creases quickly and safely.", images: ["https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80&auto=format&fit=crop"], tags: ["steamer", "garment", "appliance"], featured: false },
     // Careerday Uniforms
-    { name: "Men's White T-Shirt (M)", slug: "mens-white-tshirt-m", categorySlug: "careerday-uniforms", price: 3.00, compareAtPrice: 4.00, stock: 80, sku: "CL-001", description: "100% cotton. Comfortable everyday basic.", images: ["/images/products/placeholder.svg"], tags: ["tshirt", "men", "basics"], featured: false },
-    { name: "Ladies Socks (3-Pack)", slug: "ladies-socks-3pack", categorySlug: "careerday-uniforms", price: 2.00, compareAtPrice: null, stock: 150, sku: "CL-002", description: "Ankle socks in assorted colours. Comfortable cotton blend.", images: ["/images/products/placeholder.svg"], tags: ["socks", "women"], featured: false },
+    { name: "Doctors' Coat", slug: "doctors-coat", categorySlug: "careerday-uniforms", price: 12.00, compareAtPrice: null, stock: 60, sku: "CU-001", description: "White doctor's coat for career day and role-play activities.", images: ["https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&q=80&auto=format&fit=crop"], tags: ["doctor", "coat", "uniform"], featured: true },
+    { name: "Doctors Set", slug: "doctors-set", categorySlug: "careerday-uniforms", price: 6.00, compareAtPrice: null, stock: 80, sku: "CU-002", description: "Complete toy doctors set including stethoscope and accessories.", images: ["https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=600&q=80&auto=format&fit=crop"], tags: ["doctor", "set", "uniform"], featured: false },
+    { name: "Engineer Tools", slug: "engineer-tools", categorySlug: "careerday-uniforms", price: 5.00, compareAtPrice: null, stock: 70, sku: "CU-003", description: "Toy engineer tool set for career day role-play.", images: ["https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=600&q=80&auto=format&fit=crop"], tags: ["engineer", "tools", "uniform"], featured: false },
+    // Birthday Party Items
+    { name: "Balloons Pack of 10 Colourful Balloons", slug: "balloons-pack-of-10-colourful", categorySlug: "birthday-party-items", price: 1.00, compareAtPrice: null, stock: 500, sku: "BP-001", description: "Pack of 10 assorted colourful balloons for parties and celebrations.", images: ["https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=600&q=80&auto=format&fit=crop"], tags: ["balloons", "party", "colourful"], featured: true },
+    { name: "Balloons", slug: "balloons", categorySlug: "birthday-party-items", price: 1.00, compareAtPrice: null, stock: 400, sku: "BP-002", description: "Standard party balloons in assorted colours.", images: ["https://images.unsplash.com/photo-1478476868527-002ae3f3e159?w=600&q=80&auto=format&fit=crop"], tags: ["balloons", "party"], featured: false },
+    // Swimming Items
+    { name: "Swimming Floating Vest", slug: "swimming-floating-vest", categorySlug: "swimming-items", price: 5.00, compareAtPrice: null, stock: 60, sku: "SW-001", description: "Buoyancy vest to keep children safe and afloat while learning to swim.", images: ["https://images.unsplash.com/photo-1530549387789-4c1017266635?w=600&q=80&auto=format&fit=crop"], tags: ["swimming", "float", "vest", "safety"], featured: true },
+    // Bicycles
+    { name: "Middle Sided Bikes Ages 4–8", slug: "middle-sided-bikes-ages-4-8", categorySlug: "bicycles", price: 65.00, compareAtPrice: null, stock: 20, sku: "BI-001", description: "Sturdy mid-size bicycle designed for children aged 4 to 8 years.", images: ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80&auto=format&fit=crop"], tags: ["bicycle", "kids", "ages 4-8"], featured: true },
+    { name: "Bicycles for 6–13 Years", slug: "bicycles-for-6-13-years", categorySlug: "bicycles", price: 75.00, compareAtPrice: null, stock: 15, sku: "BI-002", description: "Full-size children's bicycle suitable for ages 6 to 13 years.", images: ["https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=600&q=80&auto=format&fit=crop"], tags: ["bicycle", "kids", "ages 6-13"], featured: true },
+    { name: "Bicycles", slug: "bicycles-standard", categorySlug: "bicycles", price: 65.00, compareAtPrice: null, stock: 25, sku: "BI-003", description: "Reliable all-purpose bicycle for everyday use.", images: ["https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=600&q=80&auto=format&fit=crop"], tags: ["bicycle", "standard"], featured: false },
+    // Home Improvement
+    { name: "Toilet Brush", slug: "toilet-brush", categorySlug: "home-improvement", price: 2.50, compareAtPrice: null, stock: 100, sku: "HI-001", description: "Durable toilet brush for thorough toilet cleaning.", images: ["https://images.unsplash.com/photo-1563453392212-326f5e854473?w=600&q=80&auto=format&fit=crop"], tags: ["toilet", "brush", "cleaning"], featured: false },
+    { name: "Shoes Rack", slug: "shoes-rack", categorySlug: "home-improvement", price: 9.00, compareAtPrice: null, stock: 40, sku: "HI-002", description: "Compact shoes rack to keep your entryway tidy and organised.", images: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80&auto=format&fit=crop"], tags: ["shoes", "rack", "organiser"], featured: false },
+    { name: "Bamboo Pegs Set of 20", slug: "bamboo-pegs-set-of-20", categorySlug: "home-improvement", price: 0.50, compareAtPrice: null, stock: 300, sku: "HI-003", description: "Eco-friendly bamboo clothes pegs, set of 20.", images: ["https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=600&q=80&auto=format&fit=crop"], tags: ["pegs", "bamboo", "laundry"], featured: false },
+    // Kitchenware
+    { name: "Plate Sponge", slug: "plate-sponge", categorySlug: "kitchenware", price: 1.00, compareAtPrice: null, stock: 250, sku: "KW-001", description: "Plate sponge used to wash plates. Tough on grease, gentle on surfaces.", images: ["https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=600&q=80&auto=format&fit=crop"], tags: ["sponge", "dishes", "cleaning"], featured: false },
+    { name: "Plate Sponge Multi-Purpose", slug: "plate-sponge-multi-purpose", categorySlug: "kitchenware", price: 0.50, compareAtPrice: null, stock: 300, sku: "KW-002", description: "Multi-purpose sponge for cleaning plates, pots, and pans.", images: ["https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=600&q=80&auto=format&fit=crop"], tags: ["sponge", "multipurpose", "cleaning"], featured: false },
+    { name: "Aluminium Foil", slug: "aluminium-foil", categorySlug: "kitchenware", price: 2.00, compareAtPrice: null, stock: 180, sku: "KW-003", description: "Heavy-duty aluminium foil for cooking, freezing, and wrapping.", images: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80&auto=format&fit=crop"], tags: ["foil", "cooking", "kitchen"], featured: false },
     // Plasticware
-    { name: "Plastic Storage Basket (3-Pack)", slug: "plastic-storage-basket-3pack", categorySlug: "plasticware", price: 2.50, compareAtPrice: 3.75, stock: 80, sku: "HH-004", description: "Stackable, versatile baskets for home organisation.", images: ["/images/products/placeholder.svg"], tags: ["storage", "organisation"], featured: false },
+    { name: "Water Bottle with Straw", slug: "water-bottle-with-straw", categorySlug: "plasticware", price: 2.50, compareAtPrice: null, stock: 200, sku: "PW-001", description: "Best-selling reusable water bottle with built-in straw.", images: ["https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&q=80&auto=format&fit=crop"], tags: ["bottle", "water", "straw"], featured: true },
+    { name: "Juice Bottle", slug: "juice-bottle", categorySlug: "plasticware", price: 3.00, compareAtPrice: null, stock: 150, sku: "PW-002", description: "Durable plastic juice bottle for storing and serving cold drinks.", images: ["https://images.unsplash.com/photo-1534353436294-0dbd4bdac845?w=600&q=80&auto=format&fit=crop"], tags: ["bottle", "juice", "drinks"], featured: false },
   ];
 
   for (const product of productData) {
@@ -140,6 +157,17 @@ async function main() {
   console.log("Seeded admin user: admin@dollarshop.co.zw");
 
   console.log("Seeding complete!");
+
+  // Flush product caches so stale data isn't served after a re-seed
+  try {
+    const keys = await redis.keys("products:*");
+    const pkeys = await redis.keys("product:*");
+    const all = [...keys, ...pkeys];
+    if (all.length > 0) await redis.del(...all);
+    console.log(`Cleared ${all.length} Redis cache entries`);
+  } catch {
+    console.warn("Redis cache flush skipped (Redis unavailable)");
+  }
 }
 
 main()
@@ -149,4 +177,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await redis.quit();
   });

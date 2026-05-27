@@ -109,7 +109,7 @@ export async function createProduct(data: ProductFormData) {
 
   revalidatePath("/admin/products");
   revalidatePath("/shop");
-  return { product };
+  return { success: true };
 }
 
 export async function updateProduct(id: string, data: Partial<ProductFormData>) {
@@ -124,7 +124,7 @@ export async function updateProduct(id: string, data: Partial<ProductFormData>) 
 
   await invalidateProductCache(product.slug);
   revalidatePath("/admin/products");
-  return { product };
+  return { success: true };
 }
 
 export async function deleteProduct(id: string) {

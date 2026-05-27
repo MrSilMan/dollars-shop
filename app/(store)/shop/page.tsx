@@ -23,6 +23,7 @@ export default async function ShopPage() {
     ...p,
     price: p.price.toNumber(),
     compareAtPrice: p.compareAtPrice?.toNumber() ?? null,
+    weight: p.weight?.toNumber() ?? null,
   }));
 
   return (

@@ -3,8 +3,10 @@ import { HeroSection } from "@/components/store/HeroSection";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { FlashSaleTimer } from "@/components/store/FlashSaleTimer";
 import { getFeaturedProducts, getFlashDeals, getAllCategories } from "@/actions/products";
+import { getActiveHeroSlides, getActiveSidePromos, getActivePromoCards } from "@/actions/homepage";
 import Link from "next/link";
 import { ShieldCheck, Truck, MessageCircle, ShoppingBasket, LayoutGrid } from "lucide-react";
+import { NewsletterSection } from "@/components/store/NewsletterSection";
 import { categoryIconMap as slugIconMap, categoryColorMap as slugColorMap } from "@/lib/categories";
 
 export const metadata: Metadata = {
@@ -12,49 +14,38 @@ export const metadata: Metadata = {
   description: "Your neighbourhood store for everyday essentials. Quality Everyday. Every Dollar Counts.",
 };
 
+type PromoCardData = { id: string; amount: string; label: string; desc: string; sub: string; href: string; leftBg: string; rightBg: string };
+
+const DEFAULT_PROMO_CARDS: PromoCardData[] = [
+  { id: "d1", amount: "30%", label: "OFF", desc: "All Groceries", sub: "Limited time", href: "/shop/daily-necessities", leftBg: "bg-(--color-danger)", rightBg: "bg-(--color-primary-light)" },
+  { id: "d2", amount: "FREE", label: "SHIP", desc: "Orders Over $15", sub: "Every order", href: "/shop", leftBg: "bg-(--color-accent)", rightBg: "bg-(--color-accent-light)" },
+  { id: "d3", amount: "NEW", label: "IN", desc: "Fresh Arrivals", sub: "Shop what's new", href: "/shop", leftBg: "bg-(--color-primary)", rightBg: "bg-(--color-primary-light)" },
+  { id: "d4", amount: "⚡", label: "FLASH", desc: "Flash Deals Today", sub: "While stocks last", href: "/shop", leftBg: "bg-linear-to-b from-(--color-primary) to-(--color-primary-dark)", rightBg: "bg-(--color-primary-light)" },
+];
+
 export default async function HomePage() {
-  const [featured, flashDeals, categories] = await Promise.all([
+  const [featured, flashDeals, categories, heroSlides, sidePromos, rawPromoCards] = await Promise.all([
     getFeaturedProducts(),
     getFlashDeals(),
     getAllCategories(),
+    getActiveHeroSlides(),
+    getActiveSidePromos(),
+    getActivePromoCards(),
   ]);
+
+  const promoCards: PromoCardData[] = rawPromoCards.length > 0 ? rawPromoCards : DEFAULT_PROMO_CARDS;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
 
       {/* ── Hero carousel + category sidebar + promo panels ── */}
-      <HeroSection categories={categories} />
+      <HeroSection categories={categories} slides={heroSlides} sidePromos={sidePromos} />
 
       {/* ── Promo / Coupon cards ── */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        {[
-          {
-            amount: "30%", label: "OFF",
-            desc: "All Groceries", sub: "Limited time",
-            href: "/shop/daily-necessities",
-            leftBg: "bg-(--color-danger)", rightBg: "bg-(--color-primary-light)",
-          },
-          {
-            amount: "FREE", label: "SHIP",
-            desc: "Orders Over $15", sub: "Every order",
-            href: "/shop",
-            leftBg: "bg-(--color-accent)", rightBg: "bg-(--color-accent-light)",
-          },
-          {
-            amount: "NEW", label: "IN",
-            desc: "Fresh Arrivals", sub: "Shop what's new",
-            href: "/shop",
-            leftBg: "bg-(--color-primary)", rightBg: "bg-(--color-primary-light)",
-          },
-          {
-            amount: "⚡", label: "FLASH",
-            desc: "Flash Deals Today", sub: "While stocks last",
-            href: "/shop",
-            leftBg: "bg-linear-to-b from-(--color-primary) to-(--color-primary-dark)", rightBg: "bg-(--color-primary-light)",
-          },
-        ].map((card) => (
+        {promoCards.map((card) => (
           <Link
-            key={card.desc}
+            key={card.id}
             href={card.href}
             className="flex rounded-xl overflow-hidden border border-(--color-border) hover:border-(--color-primary) hover:shadow-md transition-all duration-150 bg-white group"
           >
@@ -75,7 +66,7 @@ export default async function HomePage() {
       {categories.length > 0 && (
         <section className="bg-white rounded-xl p-4">
           <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-10 gap-1">
-            {categories.slice(0, 9).map((cat) => {
+            {categories.slice(0, 9).map((cat: typeof categories[number]) => {
               const Icon = slugIconMap[cat.slug] ?? ShoppingBasket;
               const colors = slugColorMap[cat.slug] ?? { bg: "#FFF3E0", color: "#E65100" };
               return (
@@ -154,6 +145,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Newsletter ── */}
+      <NewsletterSection />
 
       {/* ── Trust bar ── */}
       <section className="bg-white rounded-2xl shadow-sm border border-(--color-border) overflow-hidden">

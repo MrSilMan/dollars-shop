@@ -19,13 +19,12 @@ export default async function EditProductPage({ params }: Props) {
   if (!product) notFound();
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-5xl">
       <div className="flex items-center gap-3">
         <Link href="/admin/products" className="text-sm text-(--color-text-muted) hover:text-(--color-primary) transition-colors">← Products</Link>
         <h1 className="font-display text-2xl font-bold">Edit Product</h1>
       </div>
-      <div className="bg-white rounded-2xl border border-(--color-border) p-6">
-        <ProductForm
+      <ProductForm
           categories={categories}
           productId={product.id}
           defaultValues={{
@@ -44,7 +43,6 @@ export default async function EditProductPage({ params }: Props) {
             images: product.images,
           }}
         />
-      </div>
     </div>
   );
 }

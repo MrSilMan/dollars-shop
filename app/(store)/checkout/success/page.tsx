@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { getOrderById } from "@/actions/orders";
+import { clearCart } from "@/actions/cart";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 import { CheckCircle2, MessageCircle } from "lucide-react";
 
@@ -10,7 +11,10 @@ interface Props { searchParams: Promise<{ order?: string }> }
 
 export default async function SuccessPage({ searchParams }: Props) {
   const { order: orderId } = await searchParams;
-  const order = orderId ? await getOrderById(orderId) : null;
+  const [order] = await Promise.all([
+    orderId ? getOrderById(orderId) : Promise.resolve(null),
+    clearCart(),
+  ]);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-6">

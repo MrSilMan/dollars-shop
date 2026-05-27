@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { getCartItems } from "@/actions/cart";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 
@@ -13,6 +14,10 @@ const DELIVERY_FEE = 3;
 export default async function CheckoutPage() {
   const [session, cartItems] = await Promise.all([auth(), getCartItems()]);
   if (cartItems.length === 0) redirect("/cart");
+
+  const userPhone = session?.user?.id
+    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { phone: true } }))?.phone ?? undefined
+    : undefined;
 
   const subtotal = cartItems.reduce((s, i) => s + toNumber(i.product.price) * i.quantity, 0);
   const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
@@ -34,6 +39,7 @@ export default async function CheckoutPage() {
             total={total}
             defaultEmail={session?.user?.email ?? undefined}
             defaultName={session?.user?.name ?? undefined}
+            defaultPhone={userPhone}
           />
         </div>
 

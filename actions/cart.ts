@@ -103,6 +103,39 @@ export async function clearCart(): Promise<ActionResult> {
   }
 }
 
+export async function mergeGuestCart(): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get("cart_session")?.value;
+  if (!sessionId) return;
+
+  const guestItems = await prisma.cartItem.findMany({ where: { sessionId } });
+  if (guestItems.length === 0) return;
+
+  for (const guestItem of guestItems) {
+    const existing = await prisma.cartItem.findFirst({
+      where: { userId: session.user.id, productId: guestItem.productId },
+    });
+    if (existing) {
+      await prisma.cartItem.update({
+        where: { id: existing.id },
+        data: { quantity: existing.quantity + guestItem.quantity },
+      });
+      await prisma.cartItem.delete({ where: { id: guestItem.id } });
+    } else {
+      await prisma.cartItem.update({
+        where: { id: guestItem.id },
+        data: { userId: session.user.id, sessionId: null },
+      });
+    }
+  }
+
+  cookieStore.delete("cart_session");
+  revalidatePath("/cart");
+}
+
 export async function getCartItems() {
   const session = await auth();
   if (session?.user?.id) {

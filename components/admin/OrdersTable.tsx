@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { formatUSD } from "@/lib/utils/currency";
 
 interface Order {
@@ -13,73 +14,109 @@ interface Order {
   guestEmail?: string | null;
 }
 
-const statusColors: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-700",
-  CONFIRMED: "bg-blue-100 text-blue-700",
-  PROCESSING: "bg-indigo-100 text-indigo-700",
-  SHIPPED: "bg-cyan-100 text-cyan-700",
-  DELIVERED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-red-100 text-red-700",
-  REFUNDED: "bg-gray-100 text-gray-600",
+const statusConfig: Record<string, { badge: string; dot: string }> = {
+  PENDING:    { badge: "bg-amber-50 text-amber-700",   dot: "bg-amber-400" },
+  CONFIRMED:  { badge: "bg-blue-50 text-blue-700",     dot: "bg-blue-400" },
+  PROCESSING: { badge: "bg-indigo-50 text-indigo-700", dot: "bg-indigo-400" },
+  SHIPPED:    { badge: "bg-cyan-50 text-cyan-700",     dot: "bg-cyan-400" },
+  DELIVERED:  { badge: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-400" },
+  CANCELLED:  { badge: "bg-red-50 text-red-600",       dot: "bg-red-400" },
+  REFUNDED:   { badge: "bg-gray-100 text-gray-500",    dot: "bg-gray-400" },
 };
 
-const paymentColors: Record<string, string> = {
-  UNPAID: "bg-gray-100 text-gray-600",
-  PENDING_VERIFICATION: "bg-yellow-100 text-yellow-700",
-  PAID: "bg-green-100 text-green-700",
-  FAILED: "bg-red-100 text-red-700",
-  REFUNDED: "bg-gray-100 text-gray-600",
+const paymentConfig: Record<string, string> = {
+  UNPAID:               "bg-gray-100 text-gray-600",
+  PENDING_VERIFICATION: "bg-yellow-50 text-yellow-700",
+  PAID:                 "bg-emerald-50 text-emerald-700",
+  FAILED:               "bg-red-50 text-red-600",
+  REFUNDED:             "bg-gray-100 text-gray-500",
 };
 
 export function OrdersTable({ orders }: { orders: Order[] }) {
+  if (orders.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-(--color-surface-alt) flex items-center justify-center mb-3">
+          <ShoppingBag size={24} className="text-(--color-text-muted)" />
+        </div>
+        <p className="font-semibold text-(--color-text-primary)">No orders yet</p>
+        <p className="text-sm text-(--color-text-muted) mt-0.5">
+          Orders will appear here once customers start buying
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-(--color-border)">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-(--color-border) bg-(--color-surface-alt)">
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Order</th>
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Customer</th>
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Status</th>
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Payment</th>
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Total</th>
-            <th className="text-left px-4 py-3 font-medium text-(--color-text-muted)">Date</th>
+          <tr className="bg-(--color-surface-alt)">
+            {["Order", "Customer", "Status", "Payment", "Total", "Date"].map((h, i) => (
+              <th
+                key={h}
+                className={`px-5 py-3 text-xs font-semibold text-(--color-text-muted) uppercase tracking-wide ${i === 4 ? "text-right" : "text-left"}`}
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-(--color-border)">
-          {orders.map((order) => (
-            <tr key={order.id} className="hover:bg-(--color-surface-alt) transition-colors">
-              <td className="px-4 py-3">
-                <Link href={`/admin/orders?id=${order.id}`} className="font-medium text-(--color-primary) hover:underline price">
-                  {order.orderNumber}
-                </Link>
-              </td>
-              <td className="px-4 py-3 text-(--color-text-muted)">
-                {order.user?.name ?? order.user?.email ?? order.guestEmail ?? "Guest"}
-              </td>
-              <td className="px-4 py-3">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[order.status] ?? "bg-gray-100"}`}>
-                  {order.status}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full w-fit ${paymentColors[order.paymentStatus] ?? "bg-gray-100"}`}>
-                    {order.paymentStatus.replace("_", " ")}
+          {orders.map((order) => {
+            const st = statusConfig[order.status]  ?? { badge: "bg-gray-100 text-gray-600", dot: "bg-gray-400" };
+            const pm = paymentConfig[order.paymentStatus] ?? "bg-gray-100 text-gray-600";
+
+            return (
+              <tr key={order.id} className="hover:bg-green-50/30 transition-colors">
+                <td className="px-5 py-4">
+                  <Link
+                    href={`/admin/orders?id=${order.id}`}
+                    className="font-semibold text-(--color-primary) hover:underline price text-xs tracking-wide"
+                  >
+                    {order.orderNumber}
+                  </Link>
+                </td>
+
+                <td className="px-5 py-4">
+                  <p className="font-medium text-(--color-text-primary) leading-tight">
+                    {order.user?.name ?? "Guest"}
+                  </p>
+                  <p className="text-xs text-(--color-text-muted) mt-0.5">
+                    {order.user?.email ?? order.guestEmail ?? ""}
+                  </p>
+                </td>
+
+                <td className="px-5 py-4">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${st.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.dot}`} />
+                    {order.status}
                   </span>
-                  <span className="text-xs text-(--color-text-muted)">{order.paymentMethod}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 price font-semibold">{formatUSD(Number(order.total))}</td>
-              <td className="px-4 py-3 text-(--color-text-muted) whitespace-nowrap">
-                {new Intl.DateTimeFormat("en-ZW", { dateStyle: "medium" }).format(new Date(order.createdAt))}
-              </td>
-            </tr>
-          ))}
-          {orders.length === 0 && (
-            <tr>
-              <td colSpan={6} className="text-center py-10 text-(--color-text-muted)">No orders yet</td>
-            </tr>
-          )}
+                </td>
+
+                <td className="px-5 py-4">
+                  <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${pm}`}>
+                    {order.paymentStatus.replace(/_/g, " ")}
+                  </span>
+                  <p className="text-xs text-(--color-text-muted) mt-1 capitalize">
+                    {order.paymentMethod?.toLowerCase()}
+                  </p>
+                </td>
+
+                <td className="px-5 py-4 text-right">
+                  <span className="price font-bold text-(--color-text-primary) text-sm">
+                    {formatUSD(Number(order.total))}
+                  </span>
+                </td>
+
+                <td className="px-5 py-4 text-(--color-text-muted) whitespace-nowrap text-xs">
+                  {new Intl.DateTimeFormat("en-ZW", { dateStyle: "medium" }).format(
+                    new Date(order.createdAt)
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

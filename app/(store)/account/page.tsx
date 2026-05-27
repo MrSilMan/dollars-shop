@@ -1,5 +1,5 @@
 ﻿import type { Metadata } from "next";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getMyOrders } from "@/actions/orders";
 import Link from "next/link";
@@ -12,6 +12,11 @@ export default async function AccountPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/account");
 
+  async function handleSignOut() {
+    "use server";
+    await signOut({ redirectTo: "/" });
+  }
+
   const orders = await getMyOrders();
   const recentOrders = orders.slice(0, 3);
 
@@ -22,7 +27,7 @@ export default async function AccountPage() {
           <h1 className="font-display text-2xl font-bold">My Account</h1>
           <p className="text-(--color-text-muted) text-sm mt-1">{session.user.email}</p>
         </div>
-        <form action="/api/auth/signout" method="POST">
+        <form action={handleSignOut}>
           <button type="submit" className="flex items-center gap-2 text-sm text-(--color-text-muted) hover:text-(--color-primary) transition-colors">
             <LogOut size={16} />
             Sign Out

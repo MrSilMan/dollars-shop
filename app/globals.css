@@ -51,3 +51,8 @@ body {
 }
 
 .price { font-family: var(--font-mono-price); }
+
+/* Admin layout */
+.admin-root        { background-color: #F2F6F4; }
+.admin-sidebar     { background: linear-gradient(180deg, #18181B 0%, #1C1C1E 100%); width: 16rem; flex-shrink: 0; }
+.admin-mob-header  { background: linear-gradient(135deg, #18181B 0%, #1C1C1E 100%); }

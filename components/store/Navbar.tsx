@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingCart, Heart, User, Menu, X, Search } from "lucide-react";
+import { ShoppingCart, Heart, User, Menu, X, Search, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 
 interface NavbarProps {
   cartCount?: number;
+  wishlistCount?: number;
   userName?: string | null;
+  isAdmin?: boolean;
 }
 
 const categoryLinks = [
@@ -27,11 +29,11 @@ const categoryLinks = [
   { href: "/shop/plasticware",          label: "Plasticware" },
 ];
 
-export function Navbar({ cartCount = 0, userName }: NavbarProps) {
+export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-linear-to-b from-[#FFD8CC] to-white">
+    <header className="sticky top-0 z-50 bg-linear-to-b from-[#FEF3C7] via-[#FEF3C7] via-40% to-white">
       {/* ── Main header bar ── */}
       <div className="border-b border-border/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
@@ -71,6 +73,16 @@ export function Navbar({ cartCount = 0, userName }: NavbarProps) {
 
           {/* Icon actions */}
           <div className="flex items-center gap-0.5 shrink-0">
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="flex flex-col items-center gap-0.5 px-2 py-1 text-(--color-primary) hover:text-(--color-primary-dark) transition-colors duration-150 rounded"
+                aria-label="Admin Panel"
+              >
+                <LayoutDashboard size={20} />
+                <span className="text-[10px] hidden sm:block leading-none font-semibold">Admin</span>
+              </Link>
+            )}
             {userName ? (
               <Link
                 href="/account"
@@ -92,11 +104,20 @@ export function Navbar({ cartCount = 0, userName }: NavbarProps) {
 
             <Link
               href="/account/wishlist"
-              className="flex flex-col items-center gap-0.5 px-2 py-1 text-(--color-text-muted) hover:text-(--color-primary) transition-colors duration-150 rounded"
-              aria-label="Wishlist"
+              className={`relative flex flex-col items-center gap-0.5 px-2 py-1 transition-colors duration-150 rounded ${
+                wishlistCount > 0
+                  ? "text-(--color-danger) hover:text-(--color-danger)"
+                  : "text-(--color-text-muted) hover:text-(--color-primary)"
+              }`}
+              aria-label={`Wishlist, ${wishlistCount} items`}
             >
-              <Heart size={20} />
+              <Heart size={20} fill={wishlistCount > 0 ? "currentColor" : "none"} />
               <span className="text-[10px] hidden sm:block leading-none">Wishlist</span>
+              {wishlistCount > 0 && (
+                <span className="absolute top-0.5 right-0 bg-(--color-danger) text-white text-[9px] font-bold min-w-4 h-4 rounded-full flex items-center justify-center px-1 leading-none">
+                  {wishlistCount > 9 ? "9+" : wishlistCount}
+                </span>
+              )}
             </Link>
 
             <Link

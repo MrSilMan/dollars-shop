@@ -1,70 +1,223 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { StatsCard } from "@/components/admin/StatsCard";
 import { OrdersTable } from "@/components/admin/OrdersTable";
-import { DollarSign, ShoppingBag, Clock, AlertTriangle } from "lucide-react";
+import {
+  DollarSign,
+  ShoppingBag,
+  Clock,
+  AlertTriangle,
+  Package,
+  Users,
+  ArrowRight,
+  Activity,
+} from "lucide-react";
 import Link from "next/link";
 import { formatUSD } from "@/lib/utils/currency";
 import { RevenueChart } from "./_components/RevenueChart";
 
-export const metadata: Metadata = { title: "Admin Dashboard" };
+export const metadata: Metadata = { title: "Admin Dashboard | Dollar Shop" };
 
 export default async function AdminDashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [totalRevenue, ordersToday, pendingOrders, lowStock, recentOrders, revenueData] = await Promise.all([
-    prisma.order.aggregate({ _sum: { total: true }, where: { paymentStatus: "PAID" } }),
-    prisma.order.count({ where: { createdAt: { gte: today } } }),
-    prisma.order.count({ where: { status: "PENDING" } }),
-    prisma.product.count({ where: { stock: { lte: 10 }, isActive: true } }),
-    prisma.order.findMany({
-      take: 10,
-      orderBy: { createdAt: "desc" },
-      include: { user: { select: { name: true, email: true } } },
-    }),
-    // Last 30 days revenue per day
-    prisma.$queryRaw<{ date: string; revenue: number }[]>`
-      SELECT DATE(created_at)::text as date, SUM(total)::float as revenue
-      FROM orders
-      WHERE payment_status = 'PAID' AND created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `.catch(() => []),
-  ]);
+  const [totalRevenue, ordersToday, pendingOrders, lowStock, recentOrders, revenueData] =
+    await Promise.all([
+      prisma.order.aggregate({ _sum: { total: true }, where: { paymentStatus: "PAID" } }),
+      prisma.order.count({ where: { createdAt: { gte: today } } }),
+      prisma.order.count({ where: { status: "PENDING" } }),
+      prisma.product.count({ where: { stock: { lte: 10 }, isActive: true } }),
+      prisma.order.findMany({
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { name: true, email: true } } },
+      }),
+      prisma.$queryRaw<{ date: string; revenue: number }[]>`
+        SELECT DATE(created_at)::text as date, SUM(total)::float as revenue
+        FROM orders
+        WHERE payment_status = 'PAID' AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `.catch(() => []),
+    ]);
+
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const quickActions = [
+    { href: "/admin/products/new", label: "Add New Product", icon: Package,  colorCls: "bg-green-50 text-green-800" },
+    { href: "/admin/orders",       label: "Manage Orders",   icon: ShoppingBag, colorCls: "bg-blue-50 text-blue-700" },
+    { href: "/admin/customers",    label: "View Customers",  icon: Users,    colorCls: "bg-violet-50 text-violet-700" },
+  ];
 
   return (
-    <div className="space-y-8 max-w-7xl">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-bold">Dashboard</h1>
-        <Link href="/admin/products/new" className="bg-(--color-primary) hover:bg-(--color-primary-dark) text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
-          + Add Product
+    <div className="space-y-6 max-w-7xl">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-(--color-text-primary)">
+            {greeting}, Admin
+          </h1>
+          <p className="text-sm text-(--color-text-muted) mt-0.5">
+            {dateStr} &mdash; here&apos;s your store at a glance
+          </p>
+        </div>
+        <Link
+          href="/admin/products/new"
+          className="flex items-center gap-2 bg-(--color-primary) hover:bg-(--color-primary-dark) text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm shrink-0"
+        >
+          <Package size={15} />
+          Add Product
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard title="Total Revenue" value={formatUSD(Number(totalRevenue._sum.total ?? 0))} icon={DollarSign} color="var(--color-success)" />
-        <StatsCard title="Orders Today" value={ordersToday} icon={ShoppingBag} color="var(--color-primary)" />
-        <StatsCard title="Pending Orders" value={pendingOrders} icon={Clock} color="var(--color-accent)" />
-        <StatsCard title="Low Stock Items" value={lowStock} icon={AlertTriangle} color="#EF4444" change={lowStock > 0 ? "Needs attention" : "All good"} changeType={lowStock > 0 ? "down" : "up"} />
+        <StatsCard
+          title="Total Revenue"
+          value={formatUSD(Number(totalRevenue._sum.total ?? 0))}
+          icon={DollarSign}
+          color="green"
+          change="All-time paid"
+          changeType="neutral"
+        />
+        <StatsCard
+          title="Orders Today"
+          value={ordersToday}
+          icon={ShoppingBag}
+          color="blue"
+          change={ordersToday > 0 ? `${ordersToday} new today` : "None yet"}
+          changeType={ordersToday > 0 ? "up" : "neutral"}
+        />
+        <StatsCard
+          title="Pending Orders"
+          value={pendingOrders}
+          icon={Clock}
+          color="amber"
+          change={pendingOrders > 0 ? "Needs review" : "All caught up"}
+          changeType={pendingOrders > 0 ? "down" : "neutral"}
+        />
+        <StatsCard
+          title="Low Stock Items"
+          value={lowStock}
+          icon={AlertTriangle}
+          color={lowStock > 0 ? "red" : "green"}
+          change={lowStock > 0 ? "Needs attention" : "All good"}
+          changeType={lowStock > 0 ? "down" : "up"}
+        />
       </div>
 
-      {/* Revenue chart */}
-      {revenueData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-(--color-border) p-5">
-          <h2 className="font-semibold mb-4">Revenue — Last 30 Days</h2>
-          <RevenueChart data={revenueData} />
-        </div>
-      )}
+      {/* ── Chart + Insights ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
-      {/* Recent orders */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-lg">Recent Orders</h2>
-          <Link href="/admin/orders" className="text-sm text-(--color-primary) hover:underline">View all →</Link>
+        {/* Revenue chart */}
+        <div className="xl:col-span-2 bg-white rounded-2xl border border-(--color-border) p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="font-semibold text-base">Revenue Overview</h2>
+              <p className="text-xs text-(--color-text-muted) mt-0.5">Last 30 days</p>
+            </div>
+            <span className="flex items-center gap-1.5 text-xs text-(--color-text-muted)">
+              <span className="w-2 h-2 rounded-full bg-(--color-primary)" />
+              Revenue
+            </span>
+          </div>
+          {revenueData.length > 0 ? (
+            <RevenueChart data={revenueData} />
+          ) : (
+            <div className="h-60 flex flex-col items-center justify-center text-center gap-2">
+              <Activity size={32} className="text-(--color-border)" />
+              <p className="text-sm text-(--color-text-muted)">No revenue data yet</p>
+            </div>
+          )}
         </div>
-        <OrdersTable orders={recentOrders.map(o => ({ ...o, total: Number(o.total) }))} />
+
+        {/* Insights panel */}
+        <div className="bg-white rounded-2xl border border-(--color-border) p-6 flex flex-col gap-5">
+
+          {/* Quick actions */}
+          <div>
+            <p className="text-xs font-bold text-(--color-text-muted) uppercase tracking-widest mb-2">
+              Quick Actions
+            </p>
+            <div className="space-y-1">
+              {quickActions.map(({ href, label, icon: Icon, colorCls }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-(--color-surface-alt) transition-colors group"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorCls}`}>
+                    <Icon size={15} />
+                  </div>
+                  <span className="text-sm font-medium flex-1">{label}</span>
+                  <ArrowRight
+                    size={13}
+                    className="text-(--color-text-muted) opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
+                  />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-(--color-border)" />
+
+          {/* Store health */}
+          <div>
+            <p className="text-xs font-bold text-(--color-text-muted) uppercase tracking-widest mb-3">
+              Store Health
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-(--color-text-muted)">Pending orders</span>
+                <span className={`font-bold ${pendingOrders > 5 ? "text-red-500" : "text-(--color-success)"}`}>
+                  {pendingOrders}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-(--color-text-muted)">Low stock items</span>
+                <span className={`font-bold ${lowStock > 0 ? "text-amber-500" : "text-(--color-success)"}`}>
+                  {lowStock}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-(--color-text-muted)">Store status</span>
+                <span className="font-bold text-(--color-success) flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-(--color-success) animate-pulse" />
+                  Online
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Recent orders ── */}
+      <div className="bg-white rounded-2xl border border-(--color-border) overflow-hidden">
+        <div className="px-6 py-4 border-b border-(--color-border) flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-base">Recent Orders</h2>
+            <p className="text-xs text-(--color-text-muted) mt-0.5">Showing last 10 orders</p>
+          </div>
+          <Link
+            href="/admin/orders"
+            className="flex items-center gap-1 text-sm text-(--color-primary) font-medium hover:underline"
+          >
+            View all <ArrowRight size={13} />
+          </Link>
+        </div>
+        <OrdersTable orders={recentOrders.map((o) => ({ ...o, total: Number(o.total) }))} />
       </div>
     </div>
   );

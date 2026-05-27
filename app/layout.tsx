@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -43,7 +44,16 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${playfair.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster
+          position="bottom-right"
+          richColors
+          toastOptions={{
+            style: { borderRadius: "12px", fontSize: "13px" },
+          }}
+        />
+      </body>
     </html>
   );
 }
