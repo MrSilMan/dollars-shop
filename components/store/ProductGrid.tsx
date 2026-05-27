@@ -1,0 +1,63 @@
+import Link from "next/link";
+import { ProductCard } from "./ProductCard";
+
+interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  compareAtPrice?: number | null;
+  images: string[];
+  stock: number;
+  lowStockAlert?: number;
+  featured?: boolean;
+}
+
+interface ProductGridProps {
+  products: Product[];
+  wishlistIds?: string[];
+  emptyMessage?: string;
+}
+
+export function ProductGrid({ products, wishlistIds = [], emptyMessage = "No products found." }: ProductGridProps) {
+  if (products.length === 0) {
+    return (
+      <div className="text-center py-20 text-(--color-text-muted)">
+        <p className="text-5xl mb-4">🛒</p>
+        <p className="font-semibold text-(--color-text-primary) text-lg mb-6">{emptyMessage}</p>
+        <Link
+          href="/shop"
+          className="inline-flex items-center bg-(--color-primary) hover:bg-(--color-primary-dark) text-white font-bold px-8 py-3 rounded-full transition-colors duration-150 text-sm"
+        >
+          Start Shopping
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      {products.map((product) => (
+        <ProductCard key={product.id} product={product} wishlistIds={wishlistIds} />
+      ))}
+    </div>
+  );
+}
+
+export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-lg border border-(--color-border) overflow-hidden bg-white">
+          <div className="skeleton aspect-square" />
+          <div className="p-2.5 space-y-2">
+            <div className="skeleton h-3 w-full rounded-full" />
+            <div className="skeleton h-3 w-2/3 rounded-full" />
+            <div className="skeleton h-4 w-1/2 rounded-full mt-1" />
+            <div className="skeleton h-8 w-full rounded-full mt-2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
