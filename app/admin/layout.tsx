@@ -1,9 +1,14 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import Link from "next/link";
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import { AdminSidebar } from "./_components/AdminSidebar";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const role = (session?.user as { role?: string })?.role;
+  if (!session || role !== "ADMIN") redirect("/login");
   return (
     <div className="h-screen overflow-hidden flex admin-root">
       <AdminSidebar />

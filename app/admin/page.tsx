@@ -217,7 +217,7 @@ export default async function AdminDashboard() {
             View all <ArrowRight size={13} />
           </Link>
         </div>
-        <OrdersTable orders={recentOrders.map((o) => ({ ...o, total: Number(o.total) }))} />
+        <OrdersTable orders={recentOrders.map((o) => ({ ...o, subtotal: Number(o.subtotal), deliveryFee: Number(o.deliveryFee), discount: Number(o.discount), total: Number(o.total) }))} />
       </div>
     </div>
   );

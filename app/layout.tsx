@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Dollar Shop",
-    title: "Dollar Shop Zimbabwe",
+    title: "Dollar Shop — Softwise Investments",
     description: "Quality Everyday. Every Dollar Counts.",
   },
   manifest: "/manifest.json",

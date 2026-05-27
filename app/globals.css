@@ -56,3 +56,17 @@ body {
 .admin-root        { background-color: #F2F6F4; }
 .admin-sidebar     { background: linear-gradient(180deg, #18181B 0%, #1C1C1E 100%); width: 16rem; flex-shrink: 0; }
 .admin-mob-header  { background: linear-gradient(135deg, #18181B 0%, #1C1C1E 100%); }
+
+/* Auth pages green background */
+.auth-bg { background: linear-gradient(135deg, #1A4D3A 0%, #0F3326 60%, #143D2E 100%); }
+.auth-bubble-tr { background: rgba(255,255,255,0.04); }
+.auth-bubble-bl { background: rgba(245,166,35,0.08); }
+.auth-bubble-mid { background: rgba(255,255,255,0.03); }
+
+/* Auth split-panel */
+.auth-panel-bg    { background: linear-gradient(145deg, #1A4D3A 0%, #0F3326 55%, #0A2318 100%); }
+.auth-dot-grid    { background-image: radial-gradient(circle, #fff 1px, transparent 1px); background-size: 28px 28px; }
+.auth-orb-top     { background: radial-gradient(circle, #F5A623 0%, transparent 70%); }
+.auth-orb-bottom  { background: radial-gradient(circle, #F5A623 0%, transparent 70%); }
+.auth-feature-icon-bg { background: rgba(245,166,35,0.15); }
+

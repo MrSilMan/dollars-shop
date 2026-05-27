@@ -11,9 +11,10 @@ export const metadata: Metadata = { title: "Edit Product — Admin" };
 
 export default async function EditProductPage({ params }: Props) {
   const { id } = await params;
-  const [product, categories] = await Promise.all([
+  const [product, categories, variants] = await Promise.all([
     prisma.product.findUnique({ where: { id } }),
     getAllCategories(),
+    prisma.productVariant.findMany({ where: { productId: id }, orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }] }),
   ]);
 
   if (!product) notFound();
@@ -27,6 +28,15 @@ export default async function EditProductPage({ params }: Props) {
       <ProductForm
           categories={categories}
           productId={product.id}
+          initialVariants={variants.map(v => ({
+            id: v.id,
+            groupName: v.groupName,
+            value: v.value,
+            sku: v.sku ?? "",
+            stock: v.stock,
+            priceAdjust: Number(v.priceAdjust),
+            sortOrder: v.sortOrder,
+          }))}
           defaultValues={{
             name: product.name,
             slug: product.slug,

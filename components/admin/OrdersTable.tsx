@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
 import { formatUSD } from "@/lib/utils/currency";
@@ -32,7 +34,7 @@ const paymentConfig: Record<string, string> = {
   REFUNDED:             "bg-gray-100 text-gray-500",
 };
 
-export function OrdersTable({ orders }: { orders: Order[] }) {
+export function OrdersTable({ orders, onRowClick }: { orders: Order[]; onRowClick?: (id: string) => void }) {
   if (orders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -68,7 +70,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
             const pm = paymentConfig[order.paymentStatus] ?? "bg-gray-100 text-gray-600";
 
             return (
-              <tr key={order.id} className="hover:bg-green-50/30 transition-colors">
+              <tr key={order.id} onClick={() => onRowClick?.(order.id)} className={`transition-colors ${onRowClick ? "cursor-pointer hover:bg-green-50/50" : "hover:bg-green-50/30"}`}>
                 <td className="px-5 py-4">
                   <Link
                     href={`/admin/orders?id=${order.id}`}

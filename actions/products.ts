@@ -45,6 +45,7 @@ export async function getProductBySlug(slug: string) {
       include: {
         category: true,
         reviews: { include: { user: { select: { name: true } } }, where: { isVisible: true } },
+        variants: { orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }] },
       },
     });
   });
@@ -147,6 +148,35 @@ export async function getAllCategories() {
     where: { isActive: true },
     orderBy: { sortOrder: "asc" },
   });
+}
+
+export async function getProductVariants(productId: string) {
+  return prisma.productVariant.findMany({
+    where: { productId },
+    orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }],
+  });
+}
+
+export async function upsertVariants(productId: string, variants: { id?: string; groupName: string; value: string; sku?: string; stock: number; priceAdjust: number; sortOrder: number }[]) {
+  const session = await auth();
+  const user = session?.user as { role?: string } | undefined;
+  if (!session || user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+  await prisma.$transaction(async (tx) => {
+    const incoming = variants.filter(v => v.id);
+    const incomingIds = incoming.map(v => v.id!);
+    await tx.productVariant.deleteMany({ where: { productId, id: { notIn: incomingIds } } });
+    for (const v of variants) {
+      if (v.id) {
+        await tx.productVariant.update({ where: { id: v.id }, data: { groupName: v.groupName, value: v.value, sku: v.sku ?? null, stock: v.stock, priceAdjust: v.priceAdjust, sortOrder: v.sortOrder } });
+      } else {
+        await tx.productVariant.create({ data: { productId, groupName: v.groupName, value: v.value, sku: v.sku ?? null, stock: v.stock, priceAdjust: v.priceAdjust, sortOrder: v.sortOrder } });
+      }
+    }
+  });
+
+  revalidatePath(`/admin/products`);
+  return { success: true };
 }
 
 export async function getFlashDeals() {

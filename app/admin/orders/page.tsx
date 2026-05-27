@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
-import { OrdersTable } from "@/components/admin/OrdersTable";
 import { ShoppingBag, Clock, CreditCard, DollarSign } from "lucide-react";
 import { formatUSD } from "@/lib/utils/currency";
 import { OrderFilters } from "./_components/OrderFilters";
+import { OrdersClient } from "./_components/OrdersClient";
 
 export const metadata: Metadata = { title: "Orders — Admin | Dollar Shop" };
 
@@ -20,7 +20,10 @@ export default async function AdminOrdersPage({
 
   const allOrders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
-    include: { user: { select: { name: true, email: true } } },
+    include: {
+      user: { select: { name: true, email: true } },
+      items: true,
+    },
     take: 200,
   });
 
@@ -99,7 +102,19 @@ export default async function AdminOrdersPage({
             </p>
           </div>
         </div>
-        <OrdersTable orders={orders.map((o) => ({ ...o, total: Number(o.total) }))} />
+        <OrdersClient orders={orders.map((o) => ({
+            ...o,
+            total: Number(o.total),
+            subtotal: Number(o.subtotal),
+            deliveryFee: Number(o.deliveryFee),
+            discount: Number(o.discount),
+            shippingAddress: o.shippingAddress as Record<string, string>,
+            items: o.items.map(i => ({
+              ...i,
+              price: Number(i.price),
+              subtotal: Number(i.subtotal),
+            })),
+          }))} />
       </div>
     </div>
   );

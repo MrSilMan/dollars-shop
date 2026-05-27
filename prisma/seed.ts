@@ -156,6 +156,44 @@ async function main() {
   });
   console.log("Seeded admin user: admin@dollarshop.co.zw");
 
+  // ─── Homepage content ──────────────────────────────────────────────────────
+
+  const existingSlides = await prisma.heroSlide.count();
+  if (existingSlides === 0) {
+    await prisma.heroSlide.createMany({
+      data: [
+        { tag: "⚡ Flash Deals", tagBg: "bg-(--color-danger)", headline: "Everyday Essentials,\nUnbeatable Prices", sub: "Shop kitchenware, daily necessities & more — all under $5", ctaLabel: "Shop Deals", ctaHref: "/shop", bgFrom: "#FF4400", bgTo: "#E63900", sortOrder: 0, isActive: true },
+        { tag: "✨ New Arrivals", tagBg: "bg-white/20", headline: "Fresh Stock\nJust Landed", sub: "New products added weekly across all categories", ctaLabel: "See New Arrivals", ctaHref: "/shop", bgFrom: "#FF6A00", bgTo: "#FF4400", sortOrder: 1, isActive: true },
+        { tag: "📱 Mobile Money", tagBg: "bg-white/20", headline: "EcoCash & InnBucks\nAccepted", sub: "Fast, secure checkout with Zimbabwe's favourite payment methods", ctaLabel: "Start Shopping", ctaHref: "/shop", bgFrom: "#E63900", bgTo: "#FF6A00", sortOrder: 2, isActive: true },
+      ],
+    });
+    console.log("Seeded 3 hero slides");
+  }
+
+  const existingPromos = await prisma.sidePromo.count();
+  if (existingPromos === 0) {
+    await prisma.sidePromo.createMany({
+      data: [
+        { label: "HOT DEALS", headline: "Up to 30% Off\nDaily Necessities", href: "/shop/daily-necessities", bgFrom: "#FF4400", bgTo: "#E63900", sortOrder: 0, isActive: true },
+        { label: "PAY YOUR WAY", headline: "EcoCash &\nInnBucks", href: "/checkout", bgFrom: "#FF6A00", bgTo: "#FF4400", sortOrder: 1, isActive: true },
+      ],
+    });
+    console.log("Seeded 2 side promos");
+  }
+
+  const existingCards = await prisma.promoCard.count();
+  if (existingCards === 0) {
+    await prisma.promoCard.createMany({
+      data: [
+        { amount: "30%", label: "OFF",   desc: "All Groceries",    sub: "Limited time",      href: "/shop/daily-necessities", leftBg: "bg-(--color-danger)",                                        rightBg: "bg-(--color-primary-light)", sortOrder: 0, isActive: true },
+        { amount: "FREE", label: "SHIP",  desc: "Orders Over $15",  sub: "Every order",       href: "/shop",                   leftBg: "bg-(--color-accent)",                                        rightBg: "bg-(--color-accent-light)",  sortOrder: 1, isActive: true },
+        { amount: "NEW",  label: "IN",    desc: "Fresh Arrivals",   sub: "Shop what's new",   href: "/shop",                   leftBg: "bg-(--color-primary)",                                       rightBg: "bg-(--color-primary-light)", sortOrder: 2, isActive: true },
+        { amount: "⚡",   label: "FLASH", desc: "Flash Deals Today", sub: "While stocks last", href: "/shop",                   leftBg: "bg-linear-to-b from-(--color-primary) to-(--color-primary-dark)", rightBg: "bg-(--color-primary-light)", sortOrder: 3, isActive: true },
+      ],
+    });
+    console.log("Seeded 4 promo cards");
+  }
+
   console.log("Seeding complete!");
 
   // Flush product caches so stale data isn't served after a re-seed

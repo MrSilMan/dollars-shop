@@ -1,12 +1,72 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff, Images, LayoutTemplate, Tag } from "lucide-react";
+import { useState, useTransition, useEffect } from "react";
+import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff, Images, LayoutTemplate, Tag, X } from "lucide-react";
 import { deleteHeroSlide, deleteSidePromo, deletePromoCard, updateHeroSlide, updateSidePromo, updatePromoCard } from "@/actions/homepage";
 import { SlideForm } from "./SlideForm";
 import { SidePromoForm } from "./SidePromoForm";
 import { PromoCardForm } from "./PromoCardForm";
 import { useRouter } from "next/navigation";
+
+function ConfirmModal({ title, description, onConfirm, onCancel }: { title: string; description: string; onConfirm: () => void; onCancel: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+            <Trash2 size={15} className="text-red-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-gray-900">{title}</h3>
+            <p className="text-xs text-gray-500 mt-1">{description}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onCancel} className="px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 shrink-0">
+          <h3 className="font-semibold text-sm text-gray-800">{title}</h3>
+          <button type="button" aria-label="Close" onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 type Slide = {
   id: string;
@@ -64,6 +124,7 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
   const [editingPromo, setEditingPromo] = useState<SidePromo | null>(null);
   const [addingCard, setAddingCard] = useState(false);
   const [editingCard, setEditingCard] = useState<PromoCard | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ title: string; description: string; onConfirm: () => void } | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -79,25 +140,34 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
   async function toggleSlide(slide: Slide) {
     startTransition(async () => { await updateHeroSlide(slide.id, { isActive: !slide.isActive }); refresh(); });
   }
-  async function deleteSlide(id: string) {
-    if (!confirm("Delete this slide?")) return;
-    startTransition(async () => { await deleteHeroSlide(id); refresh(); });
+  function deleteSlide(id: string) {
+    setDeleteConfirm({
+      title: "Delete slide?",
+      description: "This slide will be permanently removed from the carousel.",
+      onConfirm: () => { setDeleteConfirm(null); startTransition(async () => { await deleteHeroSlide(id); refresh(); }); },
+    });
   }
 
   async function togglePromo(promo: SidePromo) {
     startTransition(async () => { await updateSidePromo(promo.id, { isActive: !promo.isActive }); refresh(); });
   }
-  async function deletePromo(id: string) {
-    if (!confirm("Delete this promo?")) return;
-    startTransition(async () => { await deleteSidePromo(id); refresh(); });
+  function deletePromo(id: string) {
+    setDeleteConfirm({
+      title: "Delete promo?",
+      description: "This side promo panel will be permanently removed.",
+      onConfirm: () => { setDeleteConfirm(null); startTransition(async () => { await deleteSidePromo(id); refresh(); }); },
+    });
   }
 
   async function toggleCard(card: PromoCard) {
     startTransition(async () => { await updatePromoCard(card.id, { isActive: !card.isActive }); refresh(); });
   }
-  async function deleteCard(id: string) {
-    if (!confirm("Delete this promo card?")) return;
-    startTransition(async () => { await deletePromoCard(id); refresh(); });
+  function deleteCard(id: string) {
+    setDeleteConfirm({
+      title: "Delete promo card?",
+      description: "This promo filter card will be permanently removed.",
+      onConfirm: () => { setDeleteConfirm(null); startTransition(async () => { await deletePromoCard(id); refresh(); }); },
+    });
   }
 
   const tabs: { id: Tab; label: string; icon: React.ElementType; count: number }[] = [
@@ -131,21 +201,18 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
               <h2 className="font-bold text-gray-900">Hero Carousel Slides</h2>
               <p className="text-xs text-gray-500 mt-0.5">Manage the main banner slides. Upload images or use gradient backgrounds.</p>
             </div>
-            {!addingSlide && !editingSlide && (
-              <button onClick={() => setAddingSlide(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
-                <Plus size={13} /> Add Slide
-              </button>
-            )}
+            <button type="button" onClick={() => setAddingSlide(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
+              <Plus size={13} /> Add Slide
+            </button>
           </div>
 
           {(addingSlide || editingSlide) && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">{editingSlide ? "Edit Slide" : "New Slide"}</h3>
+            <Modal title={editingSlide ? "Edit Slide" : "New Slide"} onClose={done}>
               <SlideForm slide={editingSlide ?? undefined} onDone={done} />
-            </div>
+            </Modal>
           )}
 
-          {slides.length === 0 && !addingSlide && (
+          {slides.length === 0 && (
             <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
               <Images size={32} className="text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">No slides yet. Add your first slide.</p>
@@ -204,21 +271,18 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
               <h2 className="font-bold text-gray-900">Side Promo Panels</h2>
               <p className="text-xs text-gray-500 mt-0.5">The two panels on the right of the hero (e.g. HOT DEALS, PAY YOUR WAY).</p>
             </div>
-            {!addingPromo && !editingPromo && (
-              <button onClick={() => setAddingPromo(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
-                <Plus size={13} /> Add Promo
-              </button>
-            )}
+            <button type="button" onClick={() => setAddingPromo(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
+              <Plus size={13} /> Add Promo
+            </button>
           </div>
 
           {(addingPromo || editingPromo) && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">{editingPromo ? "Edit Promo" : "New Promo"}</h3>
+            <Modal title={editingPromo ? "Edit Promo" : "New Promo"} onClose={done}>
               <SidePromoForm promo={editingPromo ?? undefined} onDone={done} />
-            </div>
+            </Modal>
           )}
 
-          {sidePromos.length === 0 && !addingPromo && (
+          {sidePromos.length === 0 && (
             <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
               <LayoutTemplate size={32} className="text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">No side promos yet.</p>
@@ -276,21 +340,18 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
               <h2 className="font-bold text-gray-900">Promo Filter Cards</h2>
               <p className="text-xs text-gray-500 mt-0.5">The 4 cards below the hero: 30% OFF, FREE SHIP, NEW IN, FLASH DEALS — and their filter subtitles.</p>
             </div>
-            {!addingCard && !editingCard && (
-              <button onClick={() => setAddingCard(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
-                <Plus size={13} /> Add Card
-              </button>
-            )}
+            <button type="button" onClick={() => setAddingCard(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
+              <Plus size={13} /> Add Card
+            </button>
           </div>
 
           {(addingCard || editingCard) && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">{editingCard ? "Edit Card" : "New Card"}</h3>
+            <Modal title={editingCard ? "Edit Card" : "New Card"} onClose={done}>
               <PromoCardForm card={editingCard ?? undefined} onDone={done} />
-            </div>
+            </Modal>
           )}
 
-          {promoCards.length === 0 && !addingCard && (
+          {promoCards.length === 0 && (
             <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
               <Tag size={32} className="text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">No promo cards yet.</p>
@@ -340,6 +401,15 @@ export function HomepageManager({ slides, sidePromos, promoCards }: Props) {
             ))}
           </div>
         </div>
+      )}
+
+      {deleteConfirm && (
+        <ConfirmModal
+          title={deleteConfirm.title}
+          description={deleteConfirm.description}
+          onConfirm={deleteConfirm.onConfirm}
+          onCancel={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );

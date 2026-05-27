@@ -89,7 +89,7 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/40">
-          <span>© {year} Dollar Shop Zimbabwe. All rights reserved.</span>
+          <span>© {year} Softwise Investments. All rights reserved.</span>
           <span>Quality Everyday. Every Dollar Counts.</span>
         </div>
       </div>

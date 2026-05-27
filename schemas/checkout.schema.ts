@@ -27,14 +27,18 @@ export const CheckoutAddressSchema = z.object({
 });
 
 export const CheckoutPaymentSchema = z.object({
-  method: z.enum(["ECOCASH", "INNBUCKS"]),
+  method: z.enum(["ECOCASH", "INNBUCKS", "CASH_ON_DELIVERY"]),
   ecocashNumber: z.string().regex(ZWPhoneRegex).optional(),
   innbucksNumber: z.string().regex(ZWPhoneRegex).optional(),
 });
 
-export const CheckoutFormSchema = CheckoutContactSchema.merge(CheckoutAddressSchema).merge(
-  CheckoutPaymentSchema
-);
+export const CouponField = z.object({
+  couponCode: z.string().optional(),
+  couponId: z.string().optional(),
+  discountAmount: z.number().min(0).optional(),
+});
+
+export const CheckoutFormSchema = CheckoutContactSchema.merge(CheckoutAddressSchema).merge(CheckoutPaymentSchema).merge(CouponField);
 
 export type CheckoutFormData = z.infer<typeof CheckoutFormSchema>;
 export type CheckoutContact = z.infer<typeof CheckoutContactSchema>;

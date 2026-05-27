@@ -8,7 +8,7 @@ import { createOrder, initiatePayment } from "@/actions/checkout";
 import { EcoCashWidget } from "./EcoCashWidget";
 import { InnBucksWidget } from "./InnBucksWidget";
 import { formatUSD } from "@/lib/utils/currency";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, Tag, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const PROVINCES = [
@@ -20,6 +20,7 @@ interface CartItem {
   id: string;
   quantity: number;
   product: { name: string; price: number | string | { toNumber: () => number }; images: string[] };
+  variant?: { groupName: string; value: string } | null;
 }
 
 interface CheckoutFormProps {
@@ -32,15 +33,40 @@ interface CheckoutFormProps {
   defaultName?: string;
 }
 
+interface AppliedCoupon {
+  couponId: string;
+  code: string;
+  type: "PERCENTAGE" | "FIXED";
+  value: number;
+  discountAmount: number;
+}
+
 const STEPS = ["Contact", "Address", "Payment", "Review"];
 
-export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defaultPhone, defaultName }: Omit<CheckoutFormProps, "subtotal"> & { subtotal?: number }) {
+export function CheckoutForm({
+  cartItems,
+  subtotal: initialSubtotal,
+  deliveryFee,
+  defaultEmail,
+  defaultPhone,
+  defaultName,
+}: Omit<CheckoutFormProps, "total"> & { subtotal: number }) {
   const [step, setStep] = useState(0);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentResult, setPaymentResult] = useState<Awaited<ReturnType<typeof initiatePayment>> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+
   const router = useRouter();
+
+  const discount = appliedCoupon?.discountAmount ?? 0;
+  const total = Math.max(0, initialSubtotal + deliveryFee - discount);
 
   const form = useForm<CheckoutFormData>({
     resolver: zodResolver(CheckoutFormSchema),
@@ -65,14 +91,54 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
 
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponInput.trim(), subtotal: initialSubtotal }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedCoupon(data);
+        form.setValue("couponId", data.couponId);
+        form.setValue("couponCode", data.code);
+        form.setValue("discountAmount", data.discountAmount);
+        setCouponInput("");
+      } else {
+        setCouponError(data.error);
+      }
+    } catch {
+      setCouponError("Failed to validate coupon");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    form.setValue("couponId", undefined);
+    form.setValue("couponCode", undefined);
+    form.setValue("discountAmount", undefined);
+  };
+
   const handleSubmit = form.handleSubmit(async (data) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await createOrder(data);
+      const result = await createOrder({ ...data, discountAmount: discount });
       if ("error" in result) { setError(result.error); setLoading(false); return; }
 
       setOrderId(result.orderId);
+
+      if (data.method === "CASH_ON_DELIVERY") {
+        router.push(`/checkout/success?order=${result.orderId}`);
+        return;
+      }
+
       const phone = data.method === "ECOCASH" ? data.ecocashNumber! : data.innbucksNumber!;
       const payment = await initiatePayment(result.orderId, phone || data.phone);
       setPaymentResult(payment);
@@ -126,7 +192,6 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
         ))}
       </div>
 
-      {/* Step content */}
       <form onSubmit={handleSubmit} noValidate>
         {/* Step 0: Contact */}
         {step === 0 && (
@@ -201,6 +266,51 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
                   </Field>
                 )}
               </PaymentOption>
+
+              <PaymentOption
+                value="CASH_ON_DELIVERY"
+                current={w.method}
+                onChange={() => form.setValue("method", "CASH_ON_DELIVERY")}
+                label="Cash on Delivery"
+                desc="Pay with cash when your order arrives"
+                emoji="💵"
+              />
+            </div>
+
+            {/* Coupon code */}
+            <div className="pt-2 border-t border-(--color-border)">
+              <p className="text-sm font-medium mb-2">Promo Code</p>
+              {appliedCoupon ? (
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span className="flex-1 text-sm font-semibold text-emerald-700 font-mono">{appliedCoupon.code}</span>
+                  <span className="text-sm text-emerald-600 font-medium">-{formatUSD(appliedCoupon.discountAmount)}</span>
+                  <button type="button" onClick={removeCoupon} aria-label="Remove coupon" className="text-emerald-500 hover:text-emerald-700 transition-colors">
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
+                    placeholder="Enter promo code"
+                    className={`${inputCls} flex-1 uppercase font-mono`}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCoupon}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-(--color-surface-alt) border border-(--color-border) rounded-xl text-sm font-medium hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                  >
+                    {couponLoading ? <Loader2 size={14} className="animate-spin" /> : <Tag size={14} />}
+                    Apply
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
             </div>
           </div>
         )}
@@ -214,12 +324,19 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
               <p><span className="text-(--color-text-muted)">Email:</span> {w.email}</p>
               <p><span className="text-(--color-text-muted)">Phone:</span> {w.phone}</p>
               <p><span className="text-(--color-text-muted)">Address:</span> {w.line1}{w.line2 ? `, ${w.line2}` : ""}, {w.city}, {w.province}</p>
-              <p><span className="text-(--color-text-muted)">Payment:</span> {w.method === "ECOCASH" ? "EcoCash" : "InnBucks"}</p>
+              <p>
+                <span className="text-(--color-text-muted)">Payment:</span>{" "}
+                {w.method === "ECOCASH" ? "EcoCash" : w.method === "INNBUCKS" ? "InnBucks" : "Cash on Delivery"}
+              </p>
             </div>
             <div className="space-y-1.5 text-sm">
               {cartItems.map((item) => (
                 <div key={item.id} className="flex justify-between">
-                  <span className="line-clamp-1 flex-1">{item.product.name} ×{item.quantity}</span>
+                  <span className="line-clamp-1 flex-1">
+                    {item.product.name}
+                    {item.variant ? <span className="text-(--color-text-muted)"> ({item.variant.groupName}: {item.variant.value})</span> : ""}
+                    {" "}×{item.quantity}
+                  </span>
                   <span className="price ml-3">{formatUSD(Number(item.product.price) * item.quantity)}</span>
                 </div>
               ))}
@@ -227,15 +344,27 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
                 <span>Delivery</span>
                 <span className="price">{deliveryFee === 0 ? "FREE" : formatUSD(deliveryFee)}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-emerald-600 font-medium">
+                  <span>Discount ({appliedCoupon.code})</span>
+                  <span className="price">-{formatUSD(appliedCoupon.discountAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold">
                 <span>Total</span>
                 <span className="price text-(--color-primary)">{formatUSD(total)}</span>
               </div>
             </div>
+
+            {w.method === "CASH_ON_DELIVERY" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                💵 You will pay <strong>{formatUSD(total)}</strong> in cash when your order is delivered. Our team will contact you to confirm.
+              </div>
+            )}
           </div>
         )}
 
-        {error && <p className="text-(--color-primary) text-sm bg-(--color-primary-light) px-4 py-2 rounded-lg">{error}</p>}
+        {error && <p className="text-(--color-primary) text-sm bg-(--color-primary-light) px-4 py-2 rounded-lg mt-4">{error}</p>}
 
         <div className="flex gap-3 mt-6">
           {step > 0 && (
@@ -249,7 +378,7 @@ export function CheckoutForm({ cartItems, deliveryFee, total, defaultEmail, defa
             </button>
           ) : (
             <button type="submit" disabled={loading} className="flex-1 bg-(--color-primary) hover:bg-(--color-primary-dark) disabled:opacity-60 text-white font-bold py-3 px-6 rounded-xl transition-colors">
-              {loading ? "Processing…" : "Place Order & Pay"}
+              {loading ? "Processing…" : w.method === "CASH_ON_DELIVERY" ? "Place Order" : "Place Order & Pay"}
             </button>
           )}
         </div>

@@ -82,6 +82,8 @@ export function SlideForm({ slide, onDone }: Props) {
     }
   }
 
+  const hasImage = !!form.imageUrl;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -96,6 +98,7 @@ export function SlideForm({ slide, onDone }: Props) {
               <img src={form.imageUrl} alt="" className="w-full h-full object-cover" />
               <button
                 type="button"
+                aria-label="Remove image"
                 onClick={() => set("imageUrl", null)}
                 className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80"
               >
@@ -122,6 +125,7 @@ export function SlideForm({ slide, onDone }: Props) {
               ref={fileRef}
               type="file"
               accept="image/*"
+              aria-label="Upload background image"
               className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
             />
@@ -129,46 +133,73 @@ export function SlideForm({ slide, onDone }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient From</label>
-          <div className="flex items-center gap-2">
-            <input type="color" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-            <input type="text" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" />
+      {hasImage ? (
+        <details className="group">
+          <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none list-none flex items-center gap-1">
+            <span className="group-open:rotate-90 transition-transform inline-block">›</span>
+            Fallback gradient <span className="font-normal">(shown if image is removed)</span>
+          </summary>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient From</label>
+              <div className="flex items-center gap-2">
+                <input type="color" aria-label="Gradient from colour picker" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+                <input type="text" aria-label="Gradient from hex value" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#FF4400" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient To</label>
+              <div className="flex items-center gap-2">
+                <input type="color" aria-label="Gradient to colour picker" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+                <input type="text" aria-label="Gradient to hex value" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#E63900" />
+              </div>
+            </div>
+          </div>
+        </details>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient From</label>
+            <div className="flex items-center gap-2">
+              <input type="color" aria-label="Gradient from colour picker" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+              <input type="text" aria-label="Gradient from hex value" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#FF4400" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient To</label>
+            <div className="flex items-center gap-2">
+              <input type="color" aria-label="Gradient to colour picker" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+              <input type="text" aria-label="Gradient to hex value" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#E63900" />
+            </div>
           </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient To</label>
-          <div className="flex items-center gap-2">
-            <input type="color" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-            <input type="text" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" />
-          </div>
-        </div>
+      )}
+
+      {hasImage && <p className="text-[10px] text-gray-400 -mt-1">Text fields below are optional when an image is uploaded.</p>}
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Tag Text <span className="text-gray-400 font-normal">(e.g. ⚡ Flash Deals){hasImage ? " · optional" : ""}</span></label>
+        <input value={form.tag} onChange={(e) => set("tag", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="⚡ Flash Deals" />
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Tag Text <span className="text-gray-400 font-normal">(e.g. ⚡ Flash Deals)</span></label>
-        <input value={form.tag} onChange={(e) => set("tag", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="⚡ Flash Deals" />
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Headline{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
+        <textarea value={form.headline} onChange={(e) => set("headline", e.target.value)} required={!hasImage} rows={2} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg resize-none" placeholder="Everyday Essentials,&#10;Unbeatable Prices" />
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Headline</label>
-        <textarea value={form.headline} onChange={(e) => set("headline", e.target.value)} required rows={2} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg resize-none" placeholder="Everyday Essentials,&#10;Unbeatable Prices" />
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Subtitle</label>
-        <input value={form.sub} onChange={(e) => set("sub", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop kitchenware, daily necessities & more" />
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Subtitle{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
+        <input value={form.sub} onChange={(e) => set("sub", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop kitchenware, daily necessities & more" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Label</label>
-          <input value={form.ctaLabel} onChange={(e) => set("ctaLabel", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop Deals" />
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Label{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
+          <input value={form.ctaLabel} onChange={(e) => set("ctaLabel", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop Deals" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Link</label>
-          <input value={form.ctaHref} onChange={(e) => set("ctaHref", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="/shop" />
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Link{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
+          <input value={form.ctaHref} onChange={(e) => set("ctaHref", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="/shop" />
         </div>
       </div>
 

@@ -36,7 +36,6 @@ export default async function CheckoutPage() {
             }))}
             subtotal={subtotal}
             deliveryFee={deliveryFee}
-            total={total}
             defaultEmail={session?.user?.email ?? undefined}
             defaultName={session?.user?.name ?? undefined}
             defaultPhone={userPhone}

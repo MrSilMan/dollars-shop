@@ -7,13 +7,26 @@ import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
 import { createProduct, updateProduct } from "@/actions/products";
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus } from "lucide-react";
+import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus, Trash2 } from "lucide-react";
+import { upsertVariants } from "@/actions/products";
 
 interface Category { id: string; name: string; }
+
+interface VariantRow {
+  id?: string;
+  groupName: string;
+  value: string;
+  sku: string;
+  stock: number;
+  priceAdjust: number;
+  sortOrder: number;
+}
+
 interface ProductFormProps {
   categories: Category[];
   defaultValues?: Partial<ProductFormData>;
   productId?: string;
+  initialVariants?: VariantRow[];
 }
 
 function slugify(str: string) {
@@ -28,7 +41,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
     <button
       type="button"
       role="switch"
-      aria-checked={checked ? "true" : "false"}
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-primary) ${checked ? "bg-(--color-primary)" : "bg-(--color-border)"}`}
     >
@@ -56,9 +69,12 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-export function ProductForm({ categories, defaultValues, productId }: ProductFormProps) {
+const emptyVariant = (): VariantRow => ({ groupName: "Size", value: "", sku: "", stock: 0, priceAdjust: 0, sortOrder: 0 });
+
+export function ProductForm({ categories, defaultValues, productId, initialVariants = [] }: ProductFormProps) {
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState<string | null>(null);
+  const [variants, setVariants]           = useState<VariantRow[]>(initialVariants);
   const [images, setImages]               = useState<string[]>(defaultValues?.images ?? []);
   const [uploadingCount, setUploading]    = useState(0);
   const [dragOver, setDragOver]           = useState(false);
@@ -135,6 +151,11 @@ export function ProductForm({ categories, defaultValues, productId }: ProductFor
   const nameReg = register("name");
   const slugReg = register("slug");
 
+  const addVariant = () => setVariants(prev => [...prev, { ...emptyVariant(), sortOrder: prev.length }]);
+  const removeVariant = (idx: number) => setVariants(prev => prev.filter((_, i) => i !== idx));
+  const updateVariant = (idx: number, patch: Partial<VariantRow>) =>
+    setVariants(prev => prev.map((v, i) => i === idx ? { ...v, ...patch } : v));
+
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true);
     setError(null);
@@ -145,10 +166,17 @@ export function ProductForm({ categories, defaultValues, productId }: ProductFor
 
       if (result && "error" in result) {
         setError(result.error ?? "An error occurred");
-      } else {
-        router.push("/admin/products");
-        router.refresh();
+        setLoading(false);
+        return;
       }
+
+      // Save variants if editing an existing product
+      if (productId && variants.length > 0) {
+        await upsertVariants(productId, variants.map((v, i) => ({ ...v, sortOrder: i })));
+      }
+
+      router.push("/admin/products");
+      router.refresh();
     } catch {
       setError("Failed to save product");
     } finally {
@@ -340,6 +368,80 @@ export function ProductForm({ categories, defaultValues, productId }: ProductFor
               </div>
             </div>
           </Card>
+
+          {/* Variants */}
+          {productId && (
+            <Card title="Variants">
+              <p className="text-xs text-(--color-text-muted) mb-3">
+                Add size, colour, or other options. Each variant tracks its own stock.
+              </p>
+              <div className="space-y-3">
+                {variants.map((v, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1fr_80px_80px_auto] gap-2 items-start">
+                    <div>
+                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Group</p>}
+                      <input
+                        value={v.groupName}
+                        onChange={e => updateVariant(idx, { groupName: e.target.value })}
+                        placeholder="Size"
+                        className={input}
+                      />
+                    </div>
+                    <div>
+                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Value</p>}
+                      <input
+                        value={v.value}
+                        onChange={e => updateVariant(idx, { value: e.target.value })}
+                        placeholder="Small"
+                        className={input}
+                      />
+                    </div>
+                    <div>
+                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Stock</p>}
+                      <input
+                        type="number"
+                        min="0"
+                        value={v.stock}
+                        aria-label="Variant stock"
+                        placeholder="0"
+                        onChange={e => updateVariant(idx, { stock: Number(e.target.value) })}
+                        className={input}
+                      />
+                    </div>
+                    <div>
+                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">+/- $</p>}
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={v.priceAdjust}
+                        aria-label="Price adjustment"
+                        placeholder="0.00"
+                        onChange={e => updateVariant(idx, { priceAdjust: Number(e.target.value) })}
+                        className={input}
+                      />
+                    </div>
+                    <div className={idx === 0 ? "mt-5" : ""}>
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(idx)}
+                        aria-label="Remove variant"
+                        className="p-2 hover:bg-red-50 rounded-lg text-(--color-text-muted) hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addVariant}
+                className="mt-3 flex items-center gap-1.5 text-sm font-medium text-(--color-primary) hover:underline"
+              >
+                <Plus size={14} /> Add variant
+              </button>
+            </Card>
+          )}
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}

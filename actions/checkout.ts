@@ -8,13 +8,15 @@ import { initiateEcoCashPayment } from "@/lib/payments/ecocash";
 import { initiateInnBucksPayment } from "@/lib/payments/innbucks";
 import { logger } from "@/lib/logger";
 import { getCartItems, clearCart } from "./cart";
+import { sendOrderConfirmationEmail, type OrderEmailData } from "@/lib/email";
 
 export type PaymentInitResult =
   | { success: true; method: "ECOCASH"; transactionId: string; amount: number }
   | { success: true; method: "INNBUCKS"; checkoutUrl: string; qrCode?: string; transactionRef: string; amount: number }
+  | { success: true; method: "CASH_ON_DELIVERY"; orderNumber: string; amount: number }
   | { success: false; error: string };
 
-export async function createOrder(data: CheckoutFormData): Promise<{ orderId: string } | { error: string }> {
+export async function createOrder(data: CheckoutFormData): Promise<{ orderId: string; orderNumber: string } | { error: string }> {
   const parsed = CheckoutFormSchema.safeParse(data);
   if (!parsed.success) return { error: "Invalid form data" };
 
@@ -30,7 +32,8 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
     0
   );
   const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
-  const total = subtotal + deliveryFee;
+  const discount = parsed.data.discountAmount ?? 0;
+  const total = Math.max(0, subtotal + deliveryFee - discount);
 
   try {
     const orderNumber = await generateOrderNumber();
@@ -40,10 +43,15 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
         userId: session?.user?.id ?? null,
         guestEmail: session ? null : parsed.data.email,
         guestPhone: session ? null : parsed.data.phone,
-        paymentMethod: parsed.data.method as "ECOCASH" | "INNBUCKS",
+        paymentMethod: parsed.data.method as "ECOCASH" | "INNBUCKS" | "CASH_ON_DELIVERY",
+        status: parsed.data.method === "CASH_ON_DELIVERY" ? "PENDING" : "PENDING",
+        paymentStatus: parsed.data.method === "CASH_ON_DELIVERY" ? "UNPAID" : "UNPAID",
         subtotal,
         deliveryFee,
+        discount,
         total,
+        couponId: parsed.data.couponId ?? null,
+        couponCode: parsed.data.couponCode ?? null,
         shippingAddress: {
           name: parsed.data.name,
           email: parsed.data.email,
@@ -62,13 +70,61 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
             price: item.product.price,
             quantity: item.quantity,
             subtotal: Number(item.product.price) * item.quantity,
+            variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
           })),
         },
       },
     });
 
+    // Increment coupon usage
+    if (parsed.data.couponId) {
+      await prisma.coupon.update({
+        where: { id: parsed.data.couponId },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    // For COD: decrement stock immediately and clear cart
+    if (parsed.data.method === "CASH_ON_DELIVERY") {
+      await prisma.$transaction(async (tx) => {
+        for (const item of cartItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+      });
+      await clearCart();
+    }
+
     logger.info("Order created", { orderId: order.id, orderNumber, total });
-    return { orderId: order.id };
+
+    // Send confirmation email (fire-and-forget)
+    const emailData: OrderEmailData = {
+      orderNumber,
+      customerName: parsed.data.name,
+      customerEmail: parsed.data.email,
+      items: cartItems.map(item => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        price: Number(item.product.price),
+        variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
+      })),
+      subtotal,
+      deliveryFee,
+      discount,
+      total,
+      paymentMethod: parsed.data.method,
+      shippingAddress: {
+        line1: parsed.data.line1,
+        line2: parsed.data.line2,
+        city: parsed.data.city,
+        province: parsed.data.province,
+      },
+    };
+    sendOrderConfirmationEmail(emailData).catch(() => {});
+
+    return { orderId: order.id, orderNumber };
   } catch (error) {
     logger.error("Order creation failed", { error });
     return { error: "Failed to create order" };
@@ -81,6 +137,10 @@ export async function initiatePayment(
 ): Promise<PaymentInitResult> {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: "Order not found" };
+
+  if (order.paymentMethod === "CASH_ON_DELIVERY") {
+    return { success: true, method: "CASH_ON_DELIVERY", orderNumber: order.orderNumber, amount: Number(order.total) };
+  }
 
   try {
     if (order.paymentMethod === "ECOCASH") {

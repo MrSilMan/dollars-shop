@@ -19,7 +19,7 @@ async function SearchResults({ query }: { query: string }) {
       <p className="text-sm text-(--color-text-muted) mb-4">
         {products.length} result{products.length !== 1 ? "s" : ""} for &ldquo;<strong>{query}</strong>&rdquo;
       </p>
-      <ProductGrid products={products as Parameters<typeof ProductGrid>[0]["products"]} emptyMessage={`No products found for "${query}"`} />
+      <ProductGrid products={products as unknown as Parameters<typeof ProductGrid>[0]["products"]} emptyMessage={`No products found for "${query}"`} />
     </>
   );
 }

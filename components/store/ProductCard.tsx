@@ -42,7 +42,7 @@ export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: Pro
     <article className="group bg-white rounded-lg overflow-hidden flex flex-col border border-(--color-border) hover:border-(--color-primary) hover:-translate-y-0.5 hover:shadow-lg transition-all duration-150">
       {/* ── Product image — square crop ── */}
       <div className="relative aspect-square overflow-hidden bg-(--color-surface-alt)">
-        <Link href={`/product/${product.slug}`} tabIndex={-1} aria-hidden="true">
+        <Link href={`/product/${product.slug}`} tabIndex={-1} aria-hidden="true" className="absolute inset-0">
           <Image
             src={image}
             alt={product.name}

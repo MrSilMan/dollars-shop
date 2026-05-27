@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -11,6 +12,10 @@ const LoginSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -40,8 +45,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account }) {
+      if (account?.provider === "google" && user?.email) {
+        let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        if (!dbUser) {
+          dbUser = await prisma.user.create({
+            data: { email: user.email, name: user.name ?? null, emailVerified: new Date() },
+          });
+        }
+        token.id = dbUser.id;
+        token.role = dbUser.role;
+      } else if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
       }

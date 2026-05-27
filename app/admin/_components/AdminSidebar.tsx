@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/customers", label: "Customers", icon: Users },
+  { href: "/admin/coupons", label: "Coupons", icon: Tag },
   { href: "/admin/homepage", label: "Homepage", icon: Layers },
 ];
 
