@@ -28,8 +28,14 @@ export const CheckoutAddressSchema = z.object({
 
 export const CheckoutPaymentSchema = z.object({
   method: z.enum(["ECOCASH", "INNBUCKS", "CASH_ON_DELIVERY"]),
-  ecocashNumber: z.string().regex(ZWPhoneRegex).optional(),
-  innbucksNumber: z.string().regex(ZWPhoneRegex).optional(),
+  ecocashNumber: z.string().optional().refine(
+    (val) => !val || ZWPhoneRegex.test(val),
+    "Enter a valid Zimbabwean mobile number (07X XXXXXXX)"
+  ),
+  innbucksNumber: z.string().optional().refine(
+    (val) => !val || ZWPhoneRegex.test(val),
+    "Enter a valid Zimbabwean mobile number (07X XXXXXXX)"
+  ),
 });
 
 export const CouponField = z.object({

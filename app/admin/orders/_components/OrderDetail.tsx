@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { updateOrderStatus } from "@/actions/admin/orders";
+import { updateOrderStatus, markCODPaymentReceived } from "@/actions/admin/orders";
 import { formatUSD } from "@/lib/utils/currency";
-import { X, Loader2, Package } from "lucide-react";
+import { X, Loader2, Package, BanknoteIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface OrderItem {
@@ -53,7 +53,9 @@ function n(v: number | { toNumber: () => number }) {
 
 export function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) {
   const [status, setStatus] = useState(order.status);
+  const [paymentStatus, setPaymentStatus] = useState(order.paymentStatus);
   const [loading, setLoading] = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
@@ -67,6 +69,19 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
     if ("error" in result) { setError(result.error ?? null); return; }
     setStatus(newStatus);
     setSuccess(`Status updated to ${newStatus}. Customer notified via email & WhatsApp.`);
+    router.refresh();
+  };
+
+  const handleMarkPaid = async () => {
+    setPayLoading(true);
+    setError(null);
+    setSuccess(null);
+    const result = await markCODPaymentReceived(order.id);
+    setPayLoading(false);
+    if ("error" in result) { setError(result.error ?? null); return; }
+    setPaymentStatus("PAID");
+    setStatus("DELIVERED");
+    setSuccess("Cash payment confirmed. Order marked as Delivered.");
     router.refresh();
   };
 
@@ -115,13 +130,32 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
             {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
           </div>
 
+          {/* COD cash collection */}
+          {order.paymentMethod === "CASH_ON_DELIVERY" && paymentStatus !== "PAID" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Cash not yet collected</p>
+                <p className="text-xs text-amber-600 mt-0.5">Confirm once driver hands over the cash.</p>
+              </div>
+              <button
+                type="button"
+                disabled={payLoading}
+                onClick={handleMarkPaid}
+                className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {payLoading ? <Loader2 size={12} className="animate-spin" /> : <BanknoteIcon size={12} />}
+                Mark as Paid
+              </button>
+            </div>
+          )}
+
           {/* Badges */}
           <div className="flex gap-2 flex-wrap">
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusColors[status] ?? "bg-gray-100 text-gray-600"}`}>
               {status}
             </span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
-              {order.paymentStatus.replace(/_/g, " ")}
+              {paymentStatus.replace(/_/g, " ")}
             </span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 capitalize">
               {order.paymentMethod.replace(/_/g, " ").toLowerCase()}

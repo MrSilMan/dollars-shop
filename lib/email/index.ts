@@ -3,7 +3,11 @@ import { orderConfirmedHtml } from "./templates/orderConfirmed";
 import { paymentReceivedHtml } from "./templates/paymentReceived";
 import { statusUpdateHtml } from "./templates/statusUpdate";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY!);
+  return _resend;
+}
 const FROM = process.env.EMAIL_FROM ?? "Dollar Shop <orders@dollarshop.co.zw>";
 
 export interface OrderEmailData {
@@ -21,7 +25,7 @@ export interface OrderEmailData {
 
 export async function sendOrderConfirmationEmail(data: OrderEmailData) {
   if (!process.env.RESEND_API_KEY) return;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: data.customerEmail,
     subject: `Order Confirmed — ${data.orderNumber} | Dollar Shop`,
@@ -31,7 +35,7 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData) {
 
 export async function sendPaymentReceivedEmail(data: OrderEmailData) {
   if (!process.env.RESEND_API_KEY) return;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: data.customerEmail,
     subject: `Payment Received — ${data.orderNumber} | Dollar Shop`,
@@ -47,7 +51,7 @@ export async function sendOrderStatusUpdateEmail(data: {
   total: number;
 }) {
   if (!process.env.RESEND_API_KEY) return;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: data.customerEmail,
     subject: `Order Update — ${data.orderNumber} | Dollar Shop`,

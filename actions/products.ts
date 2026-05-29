@@ -110,7 +110,7 @@ export async function createProduct(data: ProductFormData) {
 
   revalidatePath("/admin/products");
   revalidatePath("/shop");
-  return { success: true };
+  return { success: true, productId: product.id };
 }
 
 export async function updateProduct(id: string, data: Partial<ProductFormData>) {
@@ -175,6 +175,8 @@ export async function upsertVariants(productId: string, variants: { id?: string;
     }
   });
 
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { slug: true } });
+  if (product) await invalidateProductCache(product.slug);
   revalidatePath(`/admin/products`);
   return { success: true };
 }

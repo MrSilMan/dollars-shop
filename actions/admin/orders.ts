@@ -55,3 +55,55 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
   logger.info("Order status updated", { orderId, newStatus });
   return { success: true };
 }
+
+export async function markCODPaymentReceived(orderId: string) {
+  const session = await auth();
+  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { user: true },
+  });
+  if (!order) return { error: "Order not found" };
+  if (order.paymentMethod !== "CASH_ON_DELIVERY") return { error: "Not a Cash on Delivery order" };
+  if (order.paymentStatus === "PAID") return { error: "Payment already marked as received" };
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus: "PAID",
+      ...(order.status !== "DELIVERED" && order.status !== "CANCELLED" && order.status !== "REFUNDED"
+        ? { status: "DELIVERED" }
+        : {}),
+    },
+  });
+
+  revalidatePath("/admin/orders");
+
+  const customerEmail = order.user?.email ?? order.guestEmail;
+  const customerName  = (order.shippingAddress as { name?: string })?.name ?? order.user?.name ?? "Customer";
+  const customerPhone = (order.shippingAddress as { phone?: string })?.phone ?? order.user?.phone ?? order.guestPhone;
+  const total         = Number(order.total);
+
+  if (customerEmail) {
+    sendOrderStatusUpdateEmail({
+      orderNumber: order.orderNumber,
+      customerName,
+      customerEmail,
+      newStatus: "DELIVERED",
+      total,
+    }).catch(err => logger.error("Status email failed", { err, orderId }));
+  }
+
+  if (customerPhone) {
+    sendWhatsAppStatusUpdate({
+      phone: customerPhone,
+      orderNumber: order.orderNumber,
+      status: "DELIVERED",
+      total,
+    }).catch(err => logger.error("WhatsApp notification failed", { err, orderId }));
+  }
+
+  logger.info("COD payment marked as received", { orderId });
+  return { success: true };
+}

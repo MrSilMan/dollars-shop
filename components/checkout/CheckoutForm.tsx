@@ -141,6 +141,7 @@ export function CheckoutForm({
 
       const phone = data.method === "ECOCASH" ? data.ecocashNumber! : data.innbucksNumber!;
       const payment = await initiatePayment(result.orderId, phone || data.phone);
+      if (!payment.success) { setError(payment.error); setLoading(false); return; }
       setPaymentResult(payment);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -364,7 +365,7 @@ export function CheckoutForm({
           </div>
         )}
 
-        {error && <p className="text-(--color-primary) text-sm bg-(--color-primary-light) px-4 py-2 rounded-lg mt-4">{error}</p>}
+        {error && <p className="text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg mt-4">{error}</p>}
 
         <div className="flex gap-3 mt-6">
           {step > 0 && (
@@ -392,7 +393,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
     <div className="space-y-1.5">
       <label className="block text-sm font-medium text-(--color-text-primary)">{label}</label>
       {children}
-      {error && <p className="text-xs text-(--color-primary)">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

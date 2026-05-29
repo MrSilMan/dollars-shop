@@ -31,7 +31,11 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound();
 
-  const variants = ((product as Record<string, unknown>).variants as { id: string; groupName: string; value: string; stock: number; priceAdjust: number | { toNumber: () => number } }[] | undefined) ?? [];
+  const rawVariants = ((product as Record<string, unknown>).variants as { id: string; groupName: string; value: string; sku?: string; stock: number; priceAdjust: number | { toNumber: () => number }; sortOrder?: number }[] | undefined) ?? [];
+  const variants = rawVariants.map((v) => ({
+    ...v,
+    priceAdjust: typeof v.priceAdjust === "object" && v.priceAdjust !== null ? v.priceAdjust.toNumber() : Number(v.priceAdjust),
+  }));
   const price = toNumber(product.price);
   const compareAt = product.compareAtPrice ? toNumber(product.compareAtPrice) : null;
   const discount = calcDiscount(price, compareAt);

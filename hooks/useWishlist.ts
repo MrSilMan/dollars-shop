@@ -25,7 +25,6 @@ export function useWishlist() {
       } else {
         toast.info(productName ? `"${productName}" removed from wishlist` : "Removed from wishlist");
       }
-      router.refresh();
     });
   };
 

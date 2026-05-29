@@ -170,9 +170,9 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
         return;
       }
 
-      // Save variants if editing an existing product
-      if (productId && variants.length > 0) {
-        await upsertVariants(productId, variants.map((v, i) => ({ ...v, sortOrder: i })));
+      const savedProductId = productId ?? ("productId" in result ? result.productId : undefined);
+      if (savedProductId && variants.length > 0) {
+        await upsertVariants(savedProductId, variants.map((v, i) => ({ ...v, sortOrder: i })));
       }
 
       router.push("/admin/products");
@@ -370,78 +370,76 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
           </Card>
 
           {/* Variants */}
-          {productId && (
-            <Card title="Variants">
-              <p className="text-xs text-(--color-text-muted) mb-3">
-                Add size, colour, or other options. Each variant tracks its own stock.
-              </p>
-              <div className="space-y-3">
-                {variants.map((v, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_1fr_80px_80px_auto] gap-2 items-start">
-                    <div>
-                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Group</p>}
-                      <input
-                        value={v.groupName}
-                        onChange={e => updateVariant(idx, { groupName: e.target.value })}
-                        placeholder="Size"
-                        className={input}
-                      />
-                    </div>
-                    <div>
-                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Value</p>}
-                      <input
-                        value={v.value}
-                        onChange={e => updateVariant(idx, { value: e.target.value })}
-                        placeholder="Small"
-                        className={input}
-                      />
-                    </div>
-                    <div>
-                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Stock</p>}
-                      <input
-                        type="number"
-                        min="0"
-                        value={v.stock}
-                        aria-label="Variant stock"
-                        placeholder="0"
-                        onChange={e => updateVariant(idx, { stock: Number(e.target.value) })}
-                        className={input}
-                      />
-                    </div>
-                    <div>
-                      {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">+/- $</p>}
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={v.priceAdjust}
-                        aria-label="Price adjustment"
-                        placeholder="0.00"
-                        onChange={e => updateVariant(idx, { priceAdjust: Number(e.target.value) })}
-                        className={input}
-                      />
-                    </div>
-                    <div className={idx === 0 ? "mt-5" : ""}>
-                      <button
-                        type="button"
-                        onClick={() => removeVariant(idx)}
-                        aria-label="Remove variant"
-                        className="p-2 hover:bg-red-50 rounded-lg text-(--color-text-muted) hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+          <Card title="Variants">
+            <p className="text-xs text-(--color-text-muted) mb-3">
+              Add size, colour, or other options. Each variant tracks its own stock.
+            </p>
+            <div className="space-y-3">
+              {variants.map((v, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_1fr_80px_80px_auto] gap-2 items-start">
+                  <div>
+                    {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Group</p>}
+                    <input
+                      value={v.groupName}
+                      onChange={e => updateVariant(idx, { groupName: e.target.value })}
+                      placeholder="Size"
+                      className={input}
+                    />
                   </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addVariant}
-                className="mt-3 flex items-center gap-1.5 text-sm font-medium text-(--color-primary) hover:underline"
-              >
-                <Plus size={14} /> Add variant
-              </button>
-            </Card>
-          )}
+                  <div>
+                    {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Value</p>}
+                    <input
+                      value={v.value}
+                      onChange={e => updateVariant(idx, { value: e.target.value })}
+                      placeholder="Small"
+                      className={input}
+                    />
+                  </div>
+                  <div>
+                    {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">Stock</p>}
+                    <input
+                      type="number"
+                      min="0"
+                      value={v.stock}
+                      aria-label="Variant stock"
+                      placeholder="0"
+                      onChange={e => updateVariant(idx, { stock: Number(e.target.value) })}
+                      className={input}
+                    />
+                  </div>
+                  <div>
+                    {idx === 0 && <p className="text-[11px] font-medium text-(--color-text-muted) mb-1">+/- $</p>}
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={v.priceAdjust}
+                      aria-label="Price adjustment"
+                      placeholder="0.00"
+                      onChange={e => updateVariant(idx, { priceAdjust: Number(e.target.value) })}
+                      className={input}
+                    />
+                  </div>
+                  <div className={idx === 0 ? "mt-5" : ""}>
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(idx)}
+                      aria-label="Remove variant"
+                      className="p-2 hover:bg-red-50 rounded-lg text-(--color-text-muted) hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addVariant}
+              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-(--color-primary) hover:underline"
+            >
+              <Plus size={14} /> Add variant
+            </button>
+          </Card>
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}

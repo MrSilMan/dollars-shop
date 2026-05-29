@@ -9,6 +9,10 @@ export const redis =
     lazyConnect: true,
   });
 
+redis.on("error", () => {
+  // suppress unhandled error event — command failures are already caught in getCached/setCached
+});
+
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
 
 export async function invalidateProductCache(slug: string) {

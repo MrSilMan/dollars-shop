@@ -59,7 +59,7 @@ export async function createCoupon(data: unknown) {
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
     }});
     revalidatePath("/admin/coupons");
-    return { coupon };
+    return { coupon: { ...coupon, value: Number(coupon.value), minOrder: coupon.minOrder ? Number(coupon.minOrder) : null } };
   } catch {
     return { error: "Code already exists or database error" };
   }
@@ -81,7 +81,7 @@ export async function updateCoupon(id: string, data: unknown) {
       },
     });
     revalidatePath("/admin/coupons");
-    return { coupon };
+    return { coupon: { ...coupon, value: Number(coupon.value), minOrder: coupon.minOrder ? Number(coupon.minOrder) : null } };
   } catch {
     return { error: "Update failed" };
   }
