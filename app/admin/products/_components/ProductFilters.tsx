@@ -13,6 +13,7 @@ interface ProductFiltersProps {
   categories: Category[];
   initialSearch: string;
   initialCategory: string;
+  initialStatus: string;
   total: number;
   filtered: number;
 }
@@ -21,6 +22,7 @@ export function ProductFilters({
   categories,
   initialSearch,
   initialCategory,
+  initialStatus,
   total,
   filtered,
 }: ProductFiltersProps) {
@@ -30,12 +32,14 @@ export function ProductFilters({
 
   const [search,   setSearch]   = useState(initialSearch);
   const [category, setCategory] = useState(initialCategory);
+  const [status,   setStatus]   = useState(initialStatus);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function pushURL(newSearch: string, newCategory: string) {
+  function pushURL(newSearch: string, newCategory: string, newStatus: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (newSearch)    params.set("search",   newSearch);   else params.delete("search");
     if (newCategory)  params.set("category", newCategory); else params.delete("category");
+    if (newStatus)    params.set("status",   newStatus);   else params.delete("status");
     params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
   }
@@ -43,21 +47,27 @@ export function ProductFilters({
   function handleSearchChange(value: string) {
     setSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => pushURL(value, category), 350);
+    debounceRef.current = setTimeout(() => pushURL(value, category, status), 350);
   }
 
   function handleCategoryChange(value: string) {
     setCategory(value);
-    pushURL(search, value);
+    pushURL(search, value, status);
+  }
+
+  function handleStatusChange(value: string) {
+    setStatus(value);
+    pushURL(search, category, value);
   }
 
   function handleClear() {
     setSearch("");
     setCategory("");
+    setStatus("");
     router.push(pathname);
   }
 
-  const hasFilters = search || category;
+  const hasFilters = search || category || status;
   const isFiltered = filtered !== total;
 
   return (
@@ -87,6 +97,24 @@ export function ProductFilters({
               {cat.name}
             </option>
           ))}
+        </select>
+        <ChevronDown
+          size={13}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none"
+        />
+      </div>
+
+      {/* Status */}
+      <div className="relative">
+        <select
+          value={status}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          aria-label="Filter by status"
+          className="appearance-none pl-3.5 pr-9 py-2.5 text-sm bg-white border border-(--color-border) rounded-xl focus:outline-none focus:ring-2 focus:ring-(--color-primary)/15 focus:border-(--color-primary) transition-colors text-(--color-text-primary) cursor-pointer"
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
         </select>
         <ChevronDown
           size={13}

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createCoupon, updateCoupon, deleteCoupon } from "@/actions/coupons";
 import { Plus, Pencil, Trash2, Tag, Loader2, X, AlertTriangle } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 function ConfirmModal({ title, description, onConfirm, onCancel }: { title: string; description: string; onConfirm: () => void; onCancel: () => void }) {
   useEffect(() => {
@@ -81,7 +80,6 @@ export function CouponsManager({ initialCoupons }: { initialCoupons: Coupon[] })
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; code: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   const input = "w-full px-3 py-2 border border-(--color-border) rounded-xl text-sm outline-none focus:border-(--color-primary) bg-white";
@@ -111,8 +109,13 @@ export function CouponsManager({ initialCoupons }: { initialCoupons: Coupon[] })
     const result = editing ? await updateCoupon(editing, payload) : await createCoupon(payload);
     setLoading(false);
     if ("error" in result) { setError(result.error ?? null); return; }
+    const saved = { ...result.coupon, expiresAt: result.coupon.expiresAt ? result.coupon.expiresAt.toString() : null, createdAt: new Date(result.coupon.createdAt) };
+    if (editing) {
+      setCoupons(prev => prev.map(c => c.id === editing ? { ...c, ...saved } : c));
+    } else {
+      setCoupons(prev => [saved, ...prev]);
+    }
     reset();
-    router.refresh();
   };
 
   const startEdit = (c: Coupon) => {
@@ -207,7 +210,7 @@ export function CouponsManager({ initialCoupons }: { initialCoupons: Coupon[] })
         </div>
       )}
 
-      {/* Table */}
+      {/* Coupon list */}
       <div className="bg-white rounded-2xl border border-(--color-border) overflow-hidden">
         {coupons.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-(--color-text-muted)">
@@ -216,43 +219,82 @@ export function CouponsManager({ initialCoupons }: { initialCoupons: Coupon[] })
             <p className="text-sm mt-0.5">Create your first promo code above</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-(--color-surface-alt)">
-              <tr>
-                {["Code", "Discount", "Min Order", "Uses", "Expires", "Status", ""].map((h, i) => (
-                  <th key={h} className={`px-5 py-3 text-xs font-semibold text-(--color-text-muted) uppercase tracking-wide ${i >= 5 ? "text-right" : "text-left"}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-(--color-border)">
-              {coupons.map(c => (
-                <tr key={c.id} className="hover:bg-surface-alt/50 transition-colors">
-                  <td className="px-5 py-3 font-mono font-bold text-(--color-primary)">{c.code}</td>
-                  <td className="px-5 py-3">{c.type === "PERCENTAGE" ? `${c.value}%` : `$${c.value.toFixed(2)}`}</td>
-                  <td className="px-5 py-3 text-(--color-text-muted)">{c.minOrder ? `$${c.minOrder.toFixed(2)}` : "—"}</td>
-                  <td className="px-5 py-3 text-(--color-text-muted)">{c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}</td>
-                  <td className="px-5 py-3 text-(--color-text-muted) text-xs">
-                    {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-ZW") : "Never"}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${c.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                      {c.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button type="button" aria-label="Edit coupon" onClick={() => startEdit(c)} className="p-1.5 hover:bg-(--color-surface-alt) rounded-lg transition-colors text-(--color-text-muted) hover:text-(--color-text-primary)">
-                        <Pencil size={14} aria-hidden="true" />
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-(--color-border)">
+              {coupons.map(c => {
+                const isExpired = c.expiresAt && new Date(c.expiresAt) < new Date();
+                const statusEl = isExpired
+                  ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Expired</span>
+                  : c.isActive
+                    ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Active</span>
+                    : <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Inactive</span>;
+                return (
+                  <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono font-bold text-(--color-primary) text-sm">{c.code}</p>
+                      <p className="text-xs text-(--color-text-muted) mt-0.5">
+                        {c.type === "PERCENTAGE" ? `${c.value}%` : `$${c.value.toFixed(2)}`}
+                        {c.minOrder != null && ` · min $${c.minOrder.toFixed(2)}`}
+                        {c.maxUses != null && ` · ${c.usedCount}/${c.maxUses} uses`}
+                      </p>
+                    </div>
+                    {statusEl}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button type="button" aria-label="Edit coupon" onClick={() => startEdit(c)} className="p-2 hover:bg-(--color-surface-alt) rounded-lg transition-colors text-(--color-text-muted) hover:text-(--color-text-primary)">
+                        <Pencil size={15} aria-hidden="true" />
                       </button>
-                      <button type="button" aria-label="Delete coupon" onClick={() => handleDelete(c.id, c.code)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-(--color-text-muted) hover:text-red-600">
-                        <Trash2 size={14} aria-hidden="true" />
+                      <button type="button" aria-label="Delete coupon" onClick={() => handleDelete(c.id, c.code)} className="p-2 hover:bg-red-50 rounded-lg transition-colors text-(--color-text-muted) hover:text-red-600">
+                        <Trash2 size={15} aria-hidden="true" />
                       </button>
                     </div>
-                  </td>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <table className="hidden md:table w-full text-sm">
+              <thead className="bg-(--color-surface-alt)">
+                <tr>
+                  {["Code", "Discount", "Min Order", "Uses", "Expires", "Status", ""].map((h, i) => (
+                    <th key={h} className={`px-5 py-3 text-xs font-semibold text-(--color-text-muted) uppercase tracking-wide ${i >= 6 ? "text-right" : "text-left"}`}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-(--color-border)">
+                {coupons.map(c => (
+                  <tr key={c.id} className="hover:bg-surface-alt/50 transition-colors">
+                    <td className="px-5 py-3 font-mono font-bold text-(--color-primary)">{c.code}</td>
+                    <td className="px-5 py-3">{c.type === "PERCENTAGE" ? `${c.value}%` : `$${c.value.toFixed(2)}`}</td>
+                    <td className="px-5 py-3 text-(--color-text-muted)">{c.minOrder ? `$${c.minOrder.toFixed(2)}` : "—"}</td>
+                    <td className="px-5 py-3 text-(--color-text-muted)">{c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}</td>
+                    <td className="px-5 py-3 text-(--color-text-muted) text-xs">
+                      {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-ZW") : "Never"}
+                    </td>
+                    <td className="px-5 py-3">
+                      {(() => {
+                        const isExpired = c.expiresAt && new Date(c.expiresAt) < new Date();
+                        if (isExpired) return <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">Expired</span>;
+                        if (c.isActive) return <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">Active</span>;
+                        return <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">Inactive</span>;
+                      })()}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button type="button" aria-label="Edit coupon" onClick={() => startEdit(c)} className="p-1.5 hover:bg-(--color-surface-alt) rounded-lg transition-colors text-(--color-text-muted) hover:text-(--color-text-primary)">
+                          <Pencil size={14} aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label="Delete coupon" onClick={() => handleDelete(c.id, c.code)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-(--color-text-muted) hover:text-red-600">
+                          <Trash2 size={14} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
 

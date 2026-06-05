@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart, Check } from "lucide-react";
 import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
 import { getStockStatus, stockLabel } from "@/lib/utils/stock";
 import { useCart } from "@/hooks/useCart";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 interface Product {
   id: string;
@@ -28,7 +29,16 @@ interface ProductCardProps {
 
 export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: ProductCardProps) {
   const { add, isPending } = useCart();
+  const [justAdded, setJustAdded] = useState(false);
   const [wishPending, startWish] = useTransition();
+  const router = useRouter();
+
+  const handleAdd = async () => {
+    await add(product.id, 1);
+    setJustAdded(true);
+    router.refresh();
+    setTimeout(() => setJustAdded(false), 2000);
+  };
 
   const price = toNumber(product.price);
   const compareAt = product.compareAtPrice ? toNumber(product.compareAtPrice) : null;
@@ -115,13 +125,17 @@ export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: Pro
         {/* Add to cart */}
         <button
           type="button"
-          onClick={() => add(product.id, 1)}
-          disabled={isPending || outOfStock}
+          onClick={handleAdd}
+          disabled={isPending || justAdded || outOfStock}
           aria-label={`Add ${product.name} to cart`}
-          className="mt-auto flex items-center justify-center gap-1.5 bg-(--color-primary) hover:bg-(--color-primary-dark) active:bg-(--color-primary-dark) disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold py-2 rounded-full transition-colors duration-150"
+          className={`mt-auto flex items-center justify-center gap-1.5 text-white text-xs font-bold py-2 rounded-full transition-colors duration-150 disabled:cursor-not-allowed ${
+            justAdded
+              ? "bg-green-500 opacity-100"
+              : "bg-(--color-primary) hover:bg-(--color-primary-dark) active:bg-(--color-primary-dark) disabled:opacity-40"
+          }`}
         >
-          <ShoppingCart size={12} />
-          {isPending ? "Adding…" : outOfStock ? "Unavailable" : "Add to Cart"}
+          {justAdded ? <Check size={12} /> : <ShoppingCart size={12} />}
+          {isPending ? "Adding…" : justAdded ? "Added!" : outOfStock ? "Unavailable" : "Add to Cart"}
         </button>
       </div>
     </article>

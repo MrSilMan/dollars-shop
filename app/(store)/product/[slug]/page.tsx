@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { getProductBySlug, getProductsByCategory } from "@/actions/products";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
 import { getStockStatus, stockLabel } from "@/lib/utils/stock";
 import { AddToCartButton } from "./_components/AddToCartButton";
+import { ProductImageGallery } from "./_components/ProductImageGallery";
 import { ChevronRight, Star, ShoppingBasket } from "lucide-react";
 import { categoryIconMap } from "@/lib/categories";
 
@@ -64,32 +64,7 @@ export default async function ProductPage({ params }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Images */}
-        <div className="space-y-3">
-          <div className="relative aspect-square rounded-2xl overflow-hidden bg-(--color-surface-alt)">
-            <Image
-              src={product.images[0] ?? "/images/products/placeholder.svg"}
-              alt={product.name}
-              fill
-              className="object-cover"
-              priority
-              sizes="(max-width: 1024px) 100vw, 50vw"
-            />
-            {discount > 0 && (
-              <span className="absolute top-4 left-4 bg-(--color-accent) text-white text-sm font-bold px-3 py-1 rounded-full">
-                {discount}% OFF
-              </span>
-            )}
-          </div>
-          {product.images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto">
-              {product.images.slice(1).map((img, i) => (
-                <div key={i} className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-(--color-surface-alt) border border-(--color-border)">
-                  <Image src={img} alt={`${product.name} ${i + 2}`} fill className="object-cover" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductImageGallery images={product.images} name={product.name} discount={discount} />
 
         {/* Info */}
         <div className="space-y-5">

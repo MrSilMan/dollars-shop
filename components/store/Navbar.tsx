@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingCart, Heart, User, Menu, X, Search, LayoutDashboard } from "lucide-react";
+import { ShoppingCart, User, Heart, Menu, X, Search, LayoutDashboard, Shield } from "lucide-react";
 import { useState } from "react";
+import { useCartCount } from "@/components/store/CartCountContext";
 
 interface NavbarProps {
-  cartCount?: number;
-  wishlistCount?: number;
   userName?: string | null;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
+  logoUrl?: string;
 }
 
 const categoryLinks = [
@@ -29,11 +30,12 @@ const categoryLinks = [
   { href: "/shop/plasticware",          label: "Plasticware" },
 ];
 
-export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: NavbarProps) {
+export function Navbar({ userName, isAdmin, isSuperAdmin, logoUrl }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { cartCount, wishlistCount } = useCartCount();
 
   return (
-    <header className="sticky top-0 z-50 bg-linear-to-b from-[#FEF3C7] via-[#FEF3C7] via-40% to-white">
+    <header className="navbar-gradient sticky top-0 z-50">
       {/* ── Main header bar ── */}
       <div className="border-b border-border/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
@@ -41,7 +43,7 @@ export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: 
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0">
             <Image
-              src="/images/logo-1.png"
+              src={logoUrl ?? "/images/logo-1.png"}
               alt="Dollar Shop"
               width={180}
               height={70}
@@ -50,8 +52,8 @@ export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: 
             />
           </Link>
 
-          {/* Search bar — pill shape, gray fill */}
-          <form action="/search" className="flex-1 flex items-center min-w-0">
+          {/* Search bar — hidden on mobile, full bar on md+ */}
+          <form action="/search" className="hidden md:flex flex-1 items-center min-w-0">
             <div className="flex w-full rounded-full overflow-hidden border border-(--color-border) bg-(--color-surface-alt) max-w-2xl focus-within:border-(--color-primary) transition-colors duration-150">
               <input
                 name="q"
@@ -72,7 +74,26 @@ export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: 
           </form>
 
           {/* Icon actions */}
-          <div className="flex items-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0 ml-auto">
+            {/* Search icon — mobile only */}
+            <Link
+              href="/search"
+              className="md:hidden flex flex-col items-center gap-0.5 px-2 py-1 text-(--color-text-muted) hover:text-(--color-primary) transition-colors duration-150 rounded"
+              aria-label="Search"
+            >
+              <Search size={20} />
+            </Link>
+
+            {isSuperAdmin && (
+              <Link
+                href="/super-admin"
+                className="flex flex-col items-center gap-0.5 px-2 py-1 text-violet-600 hover:text-violet-800 transition-colors duration-150 rounded"
+                aria-label="Super Admin Panel"
+              >
+                <Shield size={20} />
+                <span className="text-[10px] hidden sm:block leading-none font-semibold">Dev</span>
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -104,15 +125,12 @@ export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: 
 
             <Link
               href="/account/wishlist"
-              className={`relative flex flex-col items-center gap-0.5 px-2 py-1 transition-colors duration-150 rounded ${
-                wishlistCount > 0
-                  ? "text-(--color-danger) hover:text-(--color-danger)"
-                  : "text-(--color-text-muted) hover:text-(--color-primary)"
-              }`}
-              aria-label={`Wishlist, ${wishlistCount} items`}
+              className="relative hidden md:flex flex-col items-center gap-0.5 px-2 py-1 transition-colors duration-150 rounded"
+              style={{ color: wishlistCount > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}
+              aria-label={`Wishlist${wishlistCount > 0 ? `, ${wishlistCount} items` : ""}`}
             >
               <Heart size={20} fill={wishlistCount > 0 ? "currentColor" : "none"} />
-              <span className="text-[10px] hidden sm:block leading-none">Wishlist</span>
+              <span className="text-[10px] leading-none">Wishlist</span>
               {wishlistCount > 0 && (
                 <span className="absolute top-0.5 right-0 bg-(--color-danger) text-white text-[9px] font-bold min-w-4 h-4 rounded-full flex items-center justify-center px-1 leading-none">
                   {wishlistCount > 9 ? "9+" : wishlistCount}
@@ -128,7 +146,7 @@ export function Navbar({ cartCount = 0, wishlistCount = 0, userName, isAdmin }: 
               <ShoppingCart size={20} />
               <span className="text-[10px] hidden sm:block leading-none">Cart</span>
               {cartCount > 0 && (
-                <span className="absolute top-0.5 right-0 bg-(--color-danger) text-white text-[9px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-1 leading-none">
+                <span className="absolute top-0.5 right-0 bg-(--color-danger) text-white text-[9px] font-bold min-w-4 h-4 rounded-full flex items-center justify-center px-1 leading-none">
                   {cartCount > 9 ? "9+" : cartCount}
                 </span>
               )}

@@ -3,33 +3,48 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/products", label: "Products", icon: Package },
-  { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
-  { href: "/admin/customers", label: "Customers", icon: Users },
-  { href: "/admin/coupons", label: "Coupons", icon: Tag },
-  { href: "/admin/homepage", label: "Homepage", icon: Layers },
+  { href: "/admin",          label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/products", label: "Products",  icon: Package },
+  { href: "/admin/orders",   label: "Orders",    icon: ShoppingBag },
+  { href: "/admin/customers",label: "Customers", icon: Users },
+  { href: "/admin/coupons",  label: "Coupons",   icon: Tag },
+  { href: "/admin/homepage", label: "Homepage",  icon: Layers },
 ];
 
-export function AdminSidebar() {
+type Props = { logoSrc?: string; isOpen?: boolean; onClose?: () => void };
+
+export function AdminSidebar({ logoSrc = "/images/logo-1.png", isOpen = false, onClose }: Props) {
   const pathname = usePathname();
 
   return (
-    <aside className="admin-sidebar max-md:hidden flex flex-col overflow-y-auto">
+    <aside
+      className={[
+        "admin-sidebar flex flex-col overflow-y-auto transition-transform duration-300",
+        // Desktop: always visible, static in flow
+        "md:relative md:translate-x-0",
+        // Mobile: fixed drawer, slides in/out
+        "max-md:fixed max-md:left-0 max-md:top-0 max-md:h-full max-md:z-40",
+        isOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+      ].join(" ")}
+    >
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/8 flex flex-col items-center">
-        <Link href="/admin" className="block">
-          <Image
-            src="/images/logo-1.png"
-            alt="Dollar Shop"
-            width={190}
-            height={72}
-            className="h-18 w-auto object-contain"
-          />
+      <div className="px-6 py-6 border-b border-white/8 flex flex-col items-center relative">
+        <button
+          type="button"
+          onClick={onClose}
+          className="md:hidden absolute right-3 top-3 w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 transition-colors"
+          aria-label="Close menu"
+        >
+          <X size={14} />
+        </button>
+
+        <Link href="/admin" className="block" onClick={onClose}>
+          <Image src={logoSrc} alt="Dollar Shop" width={190} height={72}
+                 className="h-18 w-auto object-contain" />
         </Link>
         <div className="flex items-center gap-2 mt-3">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -47,6 +62,7 @@ export function AdminSidebar() {
               <Link
                 key={href}
                 href={href}
+                onClick={onClose}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 relative overflow-hidden group
                   ${isActive
                     ? "bg-white/12 text-white"
@@ -83,6 +99,7 @@ export function AdminSidebar() {
         </form>
         <Link
           href="/"
+          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:bg-white/8 hover:text-white/80 transition-colors"
         >
           <Store size={15} className="shrink-0" />

@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
-import { createProduct, updateProduct } from "@/actions/products";
-import { useState, useCallback, useRef } from "react";
+import { createProduct, updateProduct, generateSku } from "@/actions/products";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus, Trash2 } from "lucide-react";
+import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus, Trash2, Star } from "lucide-react";
 import { upsertVariants } from "@/actions/products";
 
 interface Category { id: string; name: string; }
@@ -74,11 +74,13 @@ const emptyVariant = (): VariantRow => ({ groupName: "Size", value: "", sku: "",
 export function ProductForm({ categories, defaultValues, productId, initialVariants = [] }: ProductFormProps) {
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState<string | null>(null);
+  const tagInputRef                        = useRef<HTMLInputElement>(null);
   const [variants, setVariants]           = useState<VariantRow[]>(initialVariants);
   const [images, setImages]               = useState<string[]>(defaultValues?.images ?? []);
   const [uploadingCount, setUploading]    = useState(0);
   const [dragOver, setDragOver]           = useState(false);
   const [slugEdited, setSlugEdited]       = useState(false);
+  const [skuEdited, setSkuEdited]         = useState(!!defaultValues?.sku);
   const [imageTab, setImageTab]           = useState<"upload" | "url">("upload");
   const [urlInput, setUrlInput]           = useState("");
   const fileInputRef                       = useRef<HTMLInputElement>(null);
@@ -98,8 +100,14 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
   });
 
   const { formState: { errors }, watch, register, setValue, handleSubmit } = form;
-  const isActive  = watch("isActive");
+  const isActive   = watch("isActive");
   const isFeatured = watch("featured");
+  const categoryId = watch("categoryId");
+
+  useEffect(() => {
+    if (!categoryId || skuEdited) return;
+    generateSku(categoryId).then(sku => { if (sku) setValue("sku", sku); });
+  }, [categoryId, skuEdited, setValue]);
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
@@ -136,6 +144,14 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
     });
   };
 
+  const setCover = (url: string) => {
+    setImages(prev => {
+      const next = [url, ...prev.filter(u => u !== url)];
+      setValue("images", next);
+      return next;
+    });
+  };
+
   const addImageUrl = () => {
     const trimmed = urlInput.trim();
     if (!trimmed || images.includes(trimmed)) return;
@@ -150,6 +166,7 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
 
   const nameReg = register("name");
   const slugReg = register("slug");
+  const skuReg  = register("sku");
 
   const addVariant = () => setVariants(prev => [...prev, { ...emptyVariant(), sortOrder: prev.length }]);
   const removeVariant = (idx: number) => setVariants(prev => prev.filter((_, i) => i !== idx));
@@ -170,7 +187,7 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
         return;
       }
 
-      const savedProductId = productId ?? ("productId" in result ? result.productId : undefined);
+      const savedProductId = productId ?? ("productId" in result ? (result.productId as string) : undefined);
       if (savedProductId && variants.length > 0) {
         await upsertVariants(savedProductId, variants.map((v, i) => ({ ...v, sortOrder: i })));
       }
@@ -278,10 +295,20 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
               <div className="mt-4 flex flex-wrap gap-3">
                 {images.map((url, i) => (
                   <div key={url} className="group relative h-24 w-24 overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface-alt)">
-                    {i === 0 && (
+                    {i === 0 ? (
                       <span className="absolute left-1.5 top-1.5 z-10 rounded bg-(--color-primary) px-1.5 py-0.5 text-[9px] font-bold uppercase text-white tracking-wide">
                         Cover
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label="Set as cover"
+                        title="Set as cover"
+                        onClick={e => { e.stopPropagation(); setCover(url); }}
+                        className="absolute left-1.5 top-1.5 z-10 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity hover:bg-(--color-primary) group-hover:opacity-100"
+                      >
+                        <Star size={10} aria-hidden="true" />
+                      </button>
                     )}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt="" className="h-full w-full object-cover" />
@@ -345,7 +372,11 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
           <Card title="Details">
             <div className="space-y-4">
               <div>
-                <label className={label}>Description</label>
+                <div className="mb-1.5">
+                  <label className="text-sm font-medium">
+                    Description <span className="text-zinc-400 font-normal text-xs">optional</span>
+                  </label>
+                </div>
                 <textarea
                   {...register("description")}
                   rows={4}
@@ -359,6 +390,7 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
                   Tags <span className="text-(--color-text-muted) font-normal text-xs">— comma separated</span>
                 </label>
                 <input
+                  ref={tagInputRef}
                   type="text"
                   className={input}
                   placeholder="cleaning, antiseptic, household"
@@ -509,7 +541,12 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
             <div className="space-y-3">
               <div>
                 <label className={label}>SKU</label>
-                <input {...register("sku")} className={input} placeholder="HH-001" />
+                <input
+                  {...skuReg}
+                  onChange={e => { skuReg.onChange(e); setSkuEdited(true); }}
+                  className={input}
+                  placeholder="HH-001"
+                />
                 <FieldError message={errors.sku?.message} />
               </div>
               <div className="grid grid-cols-2 gap-3">

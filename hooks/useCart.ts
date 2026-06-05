@@ -1,30 +1,55 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useRef } from "react";
 import { addToCart, removeFromCart, updateCartQuantity } from "@/actions/cart";
+import { useCartCount } from "@/components/store/CartCountContext";
 
 export function useCart() {
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
+  const { incCart, decCart } = useCartCount();
 
-  const add = (productId: string, quantity = 1, variantId?: string) => {
-    startTransition(async () => {
+  const add = async (productId: string, quantity = 1, variantId?: string) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsPending(true);
+    try {
       const result = await addToCart(productId, quantity, variantId);
       if (!result.success) setMessage(result.error ?? "Error");
-      else setMessage(null);
-    });
+      else {
+        setMessage(null);
+        incCart();
+      }
+    } finally {
+      inFlightRef.current = false;
+      setIsPending(false);
+    }
   };
 
-  const remove = (cartItemId: string) => {
-    startTransition(async () => {
-      await removeFromCart(cartItemId);
-    });
+  const remove = async (cartItemId: string) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsPending(true);
+    try {
+      const result = await removeFromCart(cartItemId);
+      if (result.success) decCart();
+    } finally {
+      inFlightRef.current = false;
+      setIsPending(false);
+    }
   };
 
-  const update = (cartItemId: string, quantity: number) => {
-    startTransition(async () => {
+  const update = async (cartItemId: string, quantity: number) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsPending(true);
+    try {
       await updateCartQuantity(cartItemId, quantity);
-    });
+    } finally {
+      inFlightRef.current = false;
+      setIsPending(false);
+    }
   };
 
   return { add, remove, update, isPending, message };

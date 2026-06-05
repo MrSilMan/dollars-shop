@@ -20,6 +20,7 @@ const HeroSlideSchema = z.object({
   sub: z.string().min(1),
   ctaLabel: z.string().min(1),
   ctaHref: z.string().min(1),
+  ctaBg: z.string().min(1).default("#FFFFFF"),
   imageUrl: z.string().optional().nullable(),
   bgFrom: z.string().min(1),
   bgTo: z.string().min(1),

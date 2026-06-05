@@ -15,12 +15,15 @@ redis.on("error", () => {
 
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
 
-export async function invalidateProductCache(slug: string) {
-  await Promise.all([
-    redis.del(`product:${slug}`),
-    redis.del("products:featured"),
-    redis.del(`products:category:${slug}`),
-  ]);
+export async function invalidateProductCache(productSlug: string, categorySlug?: string) {
+  const keys: string[] = [`product:${productSlug}`, "products:featured"];
+
+  if (categorySlug) {
+    const categoryKeys = await redis.keys(`products:category:${categorySlug}:*`);
+    keys.push(...categoryKeys);
+  }
+
+  await Promise.all(keys.map((k) => redis.del(k)));
 }
 
 export async function getCached<T>(key: string): Promise<T | null> {

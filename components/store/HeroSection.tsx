@@ -20,6 +20,7 @@ interface HeroSlide {
   sub: string;
   ctaLabel: string;
   ctaHref: string;
+  ctaBg?: string;
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;
@@ -45,11 +46,12 @@ const defaultSlides: HeroSlide[] = [
   {
     id: "default-1",
     tag: "⚡ Flash Deals",
-    tagBg: "bg-(--color-danger)",
+    tagBg: "#ff440033",
     headline: "Everyday Essentials,\nUnbeatable Prices",
     sub: "Shop kitchenware, daily necessities & more — all under $5",
     ctaLabel: "Shop Deals",
     ctaHref: "/shop",
+    ctaBg: "#FFFFFF",
     imageUrl: null,
     bgFrom: "#FF4400",
     bgTo: "#E63900",
@@ -57,11 +59,12 @@ const defaultSlides: HeroSlide[] = [
   {
     id: "default-2",
     tag: "✨ New Arrivals",
-    tagBg: "bg-white/20",
+    tagBg: "#ffffff33",
     headline: "Fresh Stock\nJust Landed",
     sub: "New products added weekly across all categories",
     ctaLabel: "See New Arrivals",
     ctaHref: "/shop",
+    ctaBg: "#FFFFFF",
     imageUrl: null,
     bgFrom: "#FF6A00",
     bgTo: "#FF4400",
@@ -69,11 +72,12 @@ const defaultSlides: HeroSlide[] = [
   {
     id: "default-3",
     tag: "📱 Mobile Money",
-    tagBg: "bg-white/20",
+    tagBg: "#ffffff33",
     headline: "EcoCash & InnBucks\nAccepted",
     sub: "Fast, secure checkout with Zimbabwe's favourite payment methods",
     ctaLabel: "Start Shopping",
     ctaHref: "/shop",
+    ctaBg: "#FFFFFF",
     imageUrl: null,
     bgFrom: "#E63900",
     bgTo: "#FF6A00",
@@ -186,7 +190,10 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
           <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none select-none" />
         )}
         <div className="relative px-8 max-w-sm w-full z-10">
-          <span className={`inline-block ${slide.tagBg} text-white text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide`}>
+          <span
+            className="inline-block text-white text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide bg-(--tag-bg)"
+            style={{ "--tag-bg": slide.tagBg } as React.CSSProperties}
+          >
             {slide.tag}
           </span>
           <h1 className="text-2xl sm:text-4xl font-black leading-tight mb-3 whitespace-pre-line">
@@ -195,7 +202,8 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
           <p className="text-white/80 text-sm sm:text-base mb-7">{slide.sub}</p>
           <Link
             href={slide.ctaHref}
-            className="inline-flex items-center gap-2 bg-white text-(--color-primary) hover:bg-white/90 font-black px-6 py-2.5 rounded-full transition-colors duration-150 text-sm"
+            className="inline-flex items-center gap-2 bg-(--cta-bg) text-(--cta-fg) hover:opacity-90 font-black px-6 py-2.5 rounded-full transition-opacity duration-150 text-sm"
+            style={{ "--cta-bg": slide.ctaBg ?? "#FFFFFF", "--cta-fg": slide.bgFrom } as React.CSSProperties}
           >
             {slide.ctaLabel} →
           </Link>

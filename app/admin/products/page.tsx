@@ -17,14 +17,17 @@ export default async function AdminProductsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { search = "", category = "", page = "1" } = await searchParams;
+  const { search = "", category = "", status = "", page = "1" } = await searchParams;
   const searchStr   = Array.isArray(search)   ? search[0]   ?? "" : search;
   const categoryStr = Array.isArray(category) ? category[0] ?? "" : category;
+  const statusStr   = Array.isArray(status)   ? status[0]   ?? "" : status;
   const pageNum     = Math.max(1, parseInt(Array.isArray(page) ? page[0] ?? "1" : page, 10) || 1);
 
   const where = {
     ...(searchStr   && { name: { contains: searchStr, mode: "insensitive" as const } }),
     ...(categoryStr && { categoryId: categoryStr }),
+    ...(statusStr === "active"   && { isActive: true }),
+    ...(statusStr === "inactive" && { isActive: false }),
   };
 
   const [allStats, filteredCount, products, categories] = await Promise.all([
@@ -97,6 +100,7 @@ export default async function AdminProductsPage({
             categories={categories}
             initialSearch={searchStr}
             initialCategory={categoryStr}
+            initialStatus={statusStr}
             total={allStats.length}
             filtered={filteredCount}
           />

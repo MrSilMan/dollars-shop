@@ -21,11 +21,11 @@ export function NewsletterSection() {
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl" style={{ background: "linear-gradient(135deg, #1A4D3A 0%, #0F3326 60%, #143D2E 100%)" }}>
+    <section className="newsletter-bg relative overflow-hidden rounded-2xl">
       {/* Decorative blobs */}
-      <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }} />
-      <div className="absolute -bottom-16 -left-8 w-48 h-48 rounded-full" style={{ background: "rgba(245,166,35,0.08)" }} />
-      <div className="absolute top-1/2 right-1/4 w-24 h-24 rounded-full" style={{ background: "rgba(255,255,255,0.03)" }} />
+      <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-white/4" />
+      <div className="absolute -bottom-16 -left-8 w-48 h-48 rounded-full bg-accent/8" />
+      <div className="absolute top-1/2 right-1/4 w-24 h-24 rounded-full bg-white/3" />
 
       <div className="relative z-10 px-6 py-8 md:px-12 md:py-10">
         <div className="flex flex-col md:flex-row items-center gap-8">
@@ -49,7 +49,7 @@ export function NewsletterSection() {
                 { icon: Bell, label: "Restock notices" },
               ].map(({ icon: Icon, label }) => (
                 <span key={label} className="flex items-center gap-1.5 bg-white/10 text-white/75 text-xs font-medium px-3 py-1.5 rounded-full">
-                  <Icon size={12} className="text-[#F5A623]" />
+                  <Icon size={12} className="text-(--color-accent)" />
                   {label}
                 </span>
               ))}
@@ -79,8 +79,7 @@ export function NewsletterSection() {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-7 py-3.5 font-bold text-sm text-white rounded-xl transition-colors shrink-0 disabled:opacity-60"
-                  style={{ background: isPending ? "#b8791a" : "#F5A623" }}
+                  className="px-7 py-3.5 font-bold text-sm text-white rounded-xl transition-colors shrink-0 bg-(--color-accent) hover:brightness-90 disabled:opacity-60"
                 >
                   {isPending ? "Subscribing…" : "Get Deals"}
                 </button>

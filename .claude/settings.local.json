@@ -70,7 +70,12 @@
       "Bash(Select-Object FullName)",
       "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(pkg.dependencies?.next || pkg.devDependencies?.next\\)\")",
       "Bash(node -e \"const pkg = require\\('./node_modules/next/package.json'\\); console.log\\(pkg.version\\)\")",
-      "Bash(Remove-Item \"c:\\\\Users\\\\USER\\\\Documents\\\\DOCS\\\\SoftWise\\\\Softwise-Proj\\\\Dollar-Shop-App\\\\dollar-shop\\\\middleware.ts\")"
+      "Bash(Remove-Item \"c:\\\\Users\\\\USER\\\\Documents\\\\DOCS\\\\SoftWise\\\\Softwise-Proj\\\\Dollar-Shop-App\\\\dollar-shop\\\\middleware.ts\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next-auth:', p.dependencies['next-auth']\\); console.log\\('next:', p.dependencies['next']\\);\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next:', p.dependencies.next\\)\")",
+      "Bash(del \"c:\\\\Users\\\\USER\\\\Documents\\\\DOCS\\\\SoftWise\\\\Softwise-Proj\\\\Dollar-Shop-App\\\\dollar-shop\\\\middleware.ts\")",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\lib",

@@ -1,0 +1,63 @@
+import { unstable_noStore as noStore } from "next/cache";
+import { prisma } from "./prisma";
+
+export type AppSettingsData = {
+  id: string;
+  primaryColor: string;
+  accentColor: string;
+  bgColor: string;
+  textColor: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  appName: string;
+  footerText: string;
+  fontScale: "SMALL" | "MEDIUM" | "LARGE";
+  updatedAt: Date;
+};
+
+export const DEFAULT_SETTINGS: AppSettingsData = {
+  id: "default",
+  primaryColor: "#1A4D3A",
+  accentColor: "#F5A623",
+  bgColor: "#F8FAF9",
+  textColor: "#1A2E25",
+  logoUrl: null,
+  faviconUrl: null,
+  appName: "Dollar Shop",
+  footerText: "© 2025 Dollar Shop — Quality Everyday. Every Dollar Counts.",
+  fontScale: "MEDIUM",
+  updatedAt: new Date(0),
+};
+
+export async function getAppSettings(): Promise<AppSettingsData> {
+  noStore();
+  try {
+    const s = await prisma.appSettings.findFirst();
+    if (!s) return DEFAULT_SETTINGS;
+    return { ...s, fontScale: s.fontScale as AppSettingsData["fontScale"] };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+const FONT_SIZE_MAP: Record<AppSettingsData["fontScale"], string> = {
+  SMALL: "14px",
+  MEDIUM: "16px",
+  LARGE: "18px",
+};
+
+export function buildCssBlock(s: AppSettingsData): string {
+  const vars = [
+    `--color-primary: ${s.primaryColor}`,
+    `--color-primary-dark: color-mix(in srgb, ${s.primaryColor} 85%, black)`,
+    `--color-footer-bg: ${s.primaryColor}`,
+    `--color-accent: ${s.accentColor}`,
+    `--color-accent-light: color-mix(in srgb, ${s.accentColor} 15%, white)`,
+    `--color-bg: ${s.bgColor}`,
+    `--color-text-primary: ${s.textColor}`,
+  ].join("; ");
+
+  const htmlFontSize = FONT_SIZE_MAP[s.fontScale];
+
+  return `:root { ${vars} } html { font-size: ${htmlFontSize}; }`;
+}

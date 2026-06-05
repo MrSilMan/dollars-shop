@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.dollarshop.co.zw" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "plus.unsplash.com" },
+      { protocol: "https", hostname: "**" },
+      { protocol: "http", hostname: "**" },
     ],
     formats: ["image/avif", "image/webp"],
   },

@@ -94,7 +94,7 @@ export async function searchProducts(query: string) {
 export async function createProduct(data: ProductFormData) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
 
   const parsed = ProductSchema.safeParse(data);
   if (!parsed.success) return { error: "Invalid data" };
@@ -116,15 +116,19 @@ export async function createProduct(data: ProductFormData) {
 export async function updateProduct(id: string, data: Partial<ProductFormData>) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
 
   const product = await prisma.product.update({
     where: { id },
     data: { ...data, updatedAt: new Date() },
+    include: { category: true },
   });
 
-  await invalidateProductCache(product.slug);
+  await invalidateProductCache(product.slug, product.category.slug);
   revalidatePath("/admin/products");
+  revalidatePath(`/product/${product.slug}`);
+  revalidatePath(`/shop/${product.category.slug}`);
+  revalidatePath("/shop");
   return { success: true };
 }
 
@@ -179,6 +183,51 @@ export async function upsertVariants(productId: string, variants: { id?: string;
   if (product) await invalidateProductCache(product.slug);
   revalidatePath(`/admin/products`);
   return { success: true };
+}
+
+function deriveCategoryPrefix(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return name.slice(0, 2).toUpperCase();
+  return words.map(w => w[0].toUpperCase()).join("");
+}
+
+export async function generateSku(categoryId: string): Promise<string | null> {
+  const [category, existingInCategory, others] = await Promise.all([
+    prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }),
+    prisma.product.findFirst({ where: { categoryId }, select: { sku: true } }),
+    prisma.category.findMany({ where: { id: { not: categoryId } }, select: { name: true } }),
+  ]);
+  if (!category) return null;
+
+  // Respect the prefix already in use for this category
+  let prefix: string;
+  if (existingInCategory) {
+    prefix = existingInCategory.sku.split("-")[0];
+  } else {
+    const naturalPrefix = deriveCategoryPrefix(category.name);
+    const otherPrefixes = new Set(others.map(c => deriveCategoryPrefix(c.name)));
+    prefix = naturalPrefix;
+    if (otherPrefixes.has(naturalPrefix)) {
+      const words = category.name.trim().split(/\s+/);
+      const firstWord = words[0];
+      const tailInitials = words.slice(1).map(w => w[0].toUpperCase()).join("");
+      for (let len = 2; len <= firstWord.length; len++) {
+        const candidate = firstWord.slice(0, len).toUpperCase() + tailInitials;
+        if (!otherPrefixes.has(candidate)) { prefix = candidate; break; }
+      }
+    }
+  }
+
+  const existing = await prisma.product.findMany({
+    where: { sku: { startsWith: `${prefix}-` } },
+    select: { sku: true },
+  });
+  const maxNum = existing.reduce((max, { sku }) => {
+    const n = parseInt(sku.slice(prefix.length + 1), 10);
+    return isNaN(n) ? max : Math.max(max, n);
+  }, 0);
+
+  return `${prefix}-${String(maxNum + 1).padStart(3, "0")}`;
 }
 
 export async function getFlashDeals() {

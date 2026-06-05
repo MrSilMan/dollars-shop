@@ -2,14 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { Phone, Mail, MapPin, Clock, MessageCircle } from "lucide-react";
 
-export function Footer() {
+interface FooterProps {
+  footerText?: string;
+  logoUrl?: string;
+}
+
+export function Footer({ footerText, logoUrl }: FooterProps = {}) {
   const year = new Date().getFullYear();
   return (
     <footer className="bg-(--color-footer-bg) text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {/* Brand */}
         <div>
-          <Image src="/images/logo-1.png" alt="Dollar Shop" width={100} height={86} className="h-24 w-auto object-contain mb-4 brightness-0 invert" />
+          <Image src={logoUrl ?? "/images/logo-1.png"} alt="Dollar Shop" width={100} height={86} className="h-24 w-auto object-contain mb-4 brightness-0 invert" />
           <p className="text-sm text-white/70 leading-relaxed mb-4">
             Your neighbourhood store for everyday essentials. Quality Everyday. Every Dollar Counts.
           </p>
@@ -89,7 +94,7 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/40">
-          <span>© {year} Softwise Investments. All rights reserved.</span>
+          <span>{footerText ?? `© ${year} Softwise Investments. All rights reserved.`}</span>
           <span>Quality Everyday. Every Dollar Counts.</span>
         </div>
       </div>

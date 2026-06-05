@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, ImageIcon, X, Trash2 } from "lucide-react";
 import { createHeroSlide, updateHeroSlide } from "@/actions/homepage";
 
 type Slide = {
@@ -12,6 +12,7 @@ type Slide = {
   sub: string;
   ctaLabel: string;
   ctaHref: string;
+  ctaBg: string;
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;
@@ -26,17 +27,60 @@ type Props = {
 
 const DEFAULT: Omit<Slide, "id" | "createdAt" | "updatedAt"> = {
   tag: "",
-  tagBg: "bg-white/20",
+  tagBg: "#ffffff33",
   headline: "",
   sub: "",
   ctaLabel: "Shop Now",
   ctaHref: "/shop",
+  ctaBg: "#FFFFFF",
   imageUrl: null,
   bgFrom: "#FF4400",
   bgTo: "#E63900",
   sortOrder: 0,
   isActive: true,
 };
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+      {children}
+    </p>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs font-semibold text-gray-700">
+        {label}
+        {hint && <span className="ml-1.5 font-normal text-gray-400">{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2 h-9 px-2.5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors focus-within:border-gray-400 focus-within:ring-1 focus-within:ring-gray-200">
+      <input
+        type="color"
+        aria-label={`${label} colour picker`}
+        value={value.length === 9 ? value.slice(0, 7) : value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-5 h-5 rounded-sm cursor-pointer border-0 bg-transparent p-0 appearance-none shrink-0 scheme-light"
+      />
+      <input
+        type="text"
+        aria-label={`${label} hex value`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 text-xs font-mono text-gray-700 bg-transparent border-0 outline-none p-0 min-w-0"
+        placeholder="#000000"
+      />
+    </div>
+  );
+}
 
 export function SlideForm({ slide, onDone }: Props) {
   const [form, setForm] = useState(slide ?? DEFAULT);
@@ -46,6 +90,7 @@ export function SlideForm({ slide, onDone }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof typeof form, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+  const hasImage = !!form.imageUrl;
 
   async function uploadImage(file: File) {
     setUploading(true);
@@ -63,7 +108,7 @@ export function SlideForm({ slide, onDone }: Props) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -82,32 +127,75 @@ export function SlideForm({ slide, onDone }: Props) {
     }
   }
 
-  const hasImage = !!form.imageUrl;
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+          <span className="shrink-0">⚠</span>
+          {error}
+        </div>
+      )}
 
-      {/* Image upload */}
-      <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Background Image</label>
-        <div className="flex items-start gap-3">
-          {form.imageUrl ? (
-            <div className="relative w-28 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+      {/* Live Preview */}
+      <div
+        className="rounded-2xl overflow-hidden h-32 relative flex items-center px-6 shadow-inner"
+        style={{ background: `linear-gradient(135deg, ${form.bgFrom}, ${form.bgTo})` }}
+      >
+        {form.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={form.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none select-none" />
+        )}
+        <div className="relative z-10 flex-1 min-w-0">
+          {form.tag ? (
+            <span
+              className="inline-block text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full mb-2"
+              style={{ background: form.tagBg }}
+            >
+              {form.tag}
+            </span>
+          ) : (
+            <span className="inline-block text-white/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full mb-2 border border-white/20">Badge</span>
+          )}
+          <p className="text-white font-black text-sm leading-tight mb-2 whitespace-pre-line line-clamp-2">
+            {form.headline || <span className="opacity-30 font-normal">Headline text…</span>}
+          </p>
+          {form.sub && <p className="text-white/70 text-[10px] mb-2.5 line-clamp-1">{form.sub}</p>}
+          {form.ctaLabel && (
+            <span
+              className="inline-flex items-center text-[10px] font-black px-3 py-1 rounded-full"
+              style={{ background: form.ctaBg, color: form.bgFrom }}
+            >
+              {form.ctaLabel} →
+            </span>
+          )}
+        </div>
+        <span className="absolute top-2.5 right-3.5 text-[9px] text-white/30 font-bold uppercase tracking-widest select-none pointer-events-none">
+          Preview
+        </span>
+      </div>
+
+      {/* Background */}
+      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+        <SectionLabel>Background</SectionLabel>
+
+        {/* Image Upload */}
+        <div className="flex items-center gap-3">
+          {hasImage ? (
+            <div className="relative w-24 h-14 rounded-xl overflow-hidden border border-gray-200 shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.imageUrl} alt="" className="w-full h-full object-cover" />
+              <img src={form.imageUrl!} alt="" className="w-full h-full object-cover" />
               <button
                 type="button"
                 aria-label="Remove image"
                 onClick={() => set("imageUrl", null)}
-                className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80"
+                className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/50 transition-colors group"
               >
-                <X size={10} />
+                <Trash2 size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             </div>
           ) : (
-            <div className="w-28 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center shrink-0 bg-gray-50">
-              <span className="text-[10px] text-gray-400 text-center px-1">No image</span>
+            <div className="w-24 h-14 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center shrink-0 bg-white">
+              <ImageIcon size={16} className="text-gray-300" />
             </div>
           )}
           <div className="flex-1">
@@ -115,12 +203,12 @@ export function SlideForm({ slide, onDone }: Props) {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 rounded-xl transition-all disabled:opacity-50 shadow-sm"
             >
-              {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-              {uploading ? "Uploading…" : "Upload Image"}
+              {uploading ? <Loader2 size={13} className="animate-spin" /> : <ImageIcon size={13} />}
+              {uploading ? "Uploading…" : hasImage ? "Replace Image" : "Upload Image"}
             </button>
-            <p className="text-[10px] text-gray-400 mt-1">JPEG, PNG, WebP · max 5 MB. Image overlays the gradient.</p>
+            <p className="text-[10px] text-gray-400 mt-1.5">JPEG, PNG, WebP · max 5 MB</p>
             <input
               ref={fileRef}
               type="file"
@@ -131,88 +219,151 @@ export function SlideForm({ slide, onDone }: Props) {
             />
           </div>
         </div>
+
+        {/* Gradient — collapsed if image is set */}
+        {hasImage ? (
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none list-none flex items-center gap-1.5">
+              <span className="inline-block transition-transform group-open:rotate-90">›</span>
+              Fallback gradient
+            </summary>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <Field label="From">
+                <ColorInput label="Gradient from" value={form.bgFrom} onChange={(v) => set("bgFrom", v)} />
+              </Field>
+              <Field label="To">
+                <ColorInput label="Gradient to" value={form.bgTo} onChange={(v) => set("bgTo", v)} />
+              </Field>
+            </div>
+          </details>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Gradient From">
+              <ColorInput label="Gradient from" value={form.bgFrom} onChange={(v) => set("bgFrom", v)} />
+            </Field>
+            <Field label="Gradient To">
+              <ColorInput label="Gradient to" value={form.bgTo} onChange={(v) => set("bgTo", v)} />
+            </Field>
+          </div>
+        )}
       </div>
 
-      {hasImage ? (
-        <details className="group">
-          <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none list-none flex items-center gap-1">
-            <span className="group-open:rotate-90 transition-transform inline-block">›</span>
-            Fallback gradient <span className="font-normal">(shown if image is removed)</span>
-          </summary>
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient From</label>
-              <div className="flex items-center gap-2">
-                <input type="color" aria-label="Gradient from colour picker" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-                <input type="text" aria-label="Gradient from hex value" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#FF4400" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient To</label>
-              <div className="flex items-center gap-2">
-                <input type="color" aria-label="Gradient to colour picker" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-                <input type="text" aria-label="Gradient to hex value" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#E63900" />
-              </div>
-            </div>
-          </div>
-        </details>
-      ) : (
+      {/* Badge */}
+      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+        <SectionLabel>Badge</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient From</label>
-            <div className="flex items-center gap-2">
-              <input type="color" aria-label="Gradient from colour picker" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-              <input type="text" aria-label="Gradient from hex value" value={form.bgFrom} onChange={(e) => set("bgFrom", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#FF4400" />
+          <Field label="Tag Text" hint={hasImage ? "· optional" : "(e.g. ⚡ Flash Deals)"}>
+            <input
+              value={form.tag}
+              onChange={(e) => set("tag", e.target.value)}
+              required={!hasImage}
+              className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+              placeholder="⚡ Flash Deals"
+            />
+          </Field>
+          <Field label="Badge Colour">
+            <ColorInput label="Badge colour" value={form.tagBg} onChange={(v) => set("tagBg", v)} />
+            <p className="text-[10px] text-gray-400 mt-1">8-char hex for transparency</p>
+          </Field>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+        <SectionLabel>Content{hasImage && <span className="ml-1 normal-case font-normal text-gray-400 tracking-normal"> · optional</span>}</SectionLabel>
+        <Field label="Headline">
+          <textarea
+            value={form.headline}
+            onChange={(e) => set("headline", e.target.value)}
+            required={!hasImage}
+            rows={2}
+            className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl resize-none outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+            placeholder={"Everyday Essentials,\nUnbeatable Prices"}
+          />
+        </Field>
+        <Field label="Subtitle">
+          <input
+            value={form.sub}
+            onChange={(e) => set("sub", e.target.value)}
+            required={!hasImage}
+            className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+            placeholder="Shop kitchenware, daily necessities & more"
+          />
+        </Field>
+      </div>
+
+      {/* Call to Action */}
+      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+        <SectionLabel>Button{hasImage && <span className="ml-1 normal-case font-normal text-gray-400 tracking-normal"> · optional</span>}</SectionLabel>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Label">
+            <input
+              value={form.ctaLabel}
+              onChange={(e) => set("ctaLabel", e.target.value)}
+              required={!hasImage}
+              className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+              placeholder="Shop Deals"
+            />
+          </Field>
+          <Field label="Link">
+            <input
+              value={form.ctaHref}
+              onChange={(e) => set("ctaHref", e.target.value)}
+              required={!hasImage}
+              className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+              placeholder="/shop"
+            />
+          </Field>
+        </div>
+        <Field label="Button Colour">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <ColorInput label="Button colour" value={form.ctaBg} onChange={(v) => set("ctaBg", v)} />
+            </div>
+            <div
+              className="h-9 px-4 rounded-full flex items-center text-xs font-black shrink-0 pointer-events-none"
+              style={{ background: form.ctaBg, color: form.bgFrom }}
+            >
+              {form.ctaLabel || "Button"} →
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient To</label>
-            <div className="flex items-center gap-2">
-              <input type="color" aria-label="Gradient to colour picker" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-              <input type="text" aria-label="Gradient to hex value" value={form.bgTo} onChange={(e) => set("bgTo", e.target.value)} className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" placeholder="#E63900" />
-            </div>
+        </Field>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-1">
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => set("isActive", e.target.checked)}
+              className="sr-only"
+            />
+            <div
+              className={`w-9 h-5 rounded-full transition-colors ${form.isActive ? "bg-orange-500" : "bg-gray-200"}`}
+            />
+            <div
+              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.isActive ? "translate-x-4" : "translate-x-0"}`}
+            />
           </div>
-        </div>
-      )}
-
-      {hasImage && <p className="text-[10px] text-gray-400 -mt-1">Text fields below are optional when an image is uploaded.</p>}
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Tag Text <span className="text-gray-400 font-normal">(e.g. ⚡ Flash Deals){hasImage ? " · optional" : ""}</span></label>
-        <input value={form.tag} onChange={(e) => set("tag", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="⚡ Flash Deals" />
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Headline{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
-        <textarea value={form.headline} onChange={(e) => set("headline", e.target.value)} required={!hasImage} rows={2} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg resize-none" placeholder="Everyday Essentials,&#10;Unbeatable Prices" />
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Subtitle{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
-        <input value={form.sub} onChange={(e) => set("sub", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop kitchenware, daily necessities & more" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Label{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
-          <input value={form.ctaLabel} onChange={(e) => set("ctaLabel", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="Shop Deals" />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Button Link{hasImage ? <span className="text-gray-400 font-normal"> · optional</span> : ""}</label>
-          <input value={form.ctaHref} onChange={(e) => set("ctaHref", e.target.value)} required={!hasImage} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="/shop" />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" checked={form.isActive} onChange={(e) => set("isActive", e.target.checked)} className="w-4 h-4 rounded accent-orange-500" />
-          <span className="text-xs font-semibold text-gray-600">Active (shown on site)</span>
+          <span className="text-xs font-semibold text-gray-700">
+            {form.isActive ? "Active" : "Hidden"}
+          </span>
         </label>
         <div className="flex gap-2">
-          <button type="button" onClick={onDone} className="px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+          <button
+            type="button"
+            onClick={onDone}
+            className="px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+          >
             Cancel
           </button>
-          <button type="submit" disabled={saving || uploading} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={saving || uploading}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+          >
             {saving && <Loader2 size={13} className="animate-spin" />}
             {slide ? "Save Changes" : "Add Slide"}
           </button>

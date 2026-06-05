@@ -38,6 +38,14 @@ body {
 ::-webkit-scrollbar-track { background: var(--color-surface-alt); }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 
+.zoom-layer {
+  position: absolute;
+  inset: 0;
+  transform: scale(var(--zoom-scale, 1));
+  transform-origin: var(--zoom-origin, 50% 50%);
+  transition: transform 0.3s ease-out;
+}
+
 @keyframes skeleton-shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -52,21 +60,39 @@ body {
 
 .price { font-family: var(--font-mono-price); }
 
+.navbar-gradient {
+  background: linear-gradient(to bottom, var(--color-accent-light) 0%, var(--color-accent-light) 40%, white 100%);
+}
+
 /* Admin layout */
 .admin-root        { background-color: #F2F6F4; }
 .admin-sidebar     { background: linear-gradient(180deg, #18181B 0%, #1C1C1E 100%); width: 16rem; flex-shrink: 0; }
 .admin-mob-header  { background: linear-gradient(135deg, #18181B 0%, #1C1C1E 100%); }
 
 /* Auth pages green background */
-.auth-bg { background: linear-gradient(135deg, #1A4D3A 0%, #0F3326 60%, #143D2E 100%); }
+.auth-bg { background: linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 80%, black) 60%, var(--color-primary-dark) 100%); }
 .auth-bubble-tr { background: rgba(255,255,255,0.04); }
-.auth-bubble-bl { background: rgba(245,166,35,0.08); }
+.auth-bubble-bl { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
 .auth-bubble-mid { background: rgba(255,255,255,0.03); }
 
+/* Newsletter section */
+.newsletter-bg { background: linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 80%, black) 60%, var(--color-primary-dark) 100%); }
+
+/* Color swatches for promo card background picker */
+.swatch-red          { background: var(--color-danger); }
+.swatch-orange       { background: var(--color-accent); }
+.swatch-dark-green   { background: var(--color-primary); }
+.swatch-green-grad   { background: linear-gradient(to bottom, var(--color-primary), var(--color-primary-dark)); }
+.swatch-light-green  { background: var(--color-primary-light); }
+.swatch-light-cream  { background: var(--color-accent-light); }
+
 /* Auth split-panel */
-.auth-panel-bg    { background: linear-gradient(145deg, #1A4D3A 0%, #0F3326 55%, #0A2318 100%); }
+.auth-panel-bg    { background: linear-gradient(145deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 70%, black) 55%, var(--color-primary-dark) 100%); }
 .auth-dot-grid    { background-image: radial-gradient(circle, #fff 1px, transparent 1px); background-size: 28px 28px; }
-.auth-orb-top     { background: radial-gradient(circle, #F5A623 0%, transparent 70%); }
-.auth-orb-bottom  { background: radial-gradient(circle, #F5A623 0%, transparent 70%); }
-.auth-feature-icon-bg { background: rgba(245,166,35,0.15); }
+.auth-orb-top     { background: radial-gradient(circle, var(--color-accent) 0%, transparent 70%); }
+.auth-orb-bottom  { background: radial-gradient(circle, var(--color-accent) 0%, transparent 70%); }
+.auth-feature-icon-bg { background: color-mix(in srgb, var(--color-accent) 15%, transparent); }
+
+/* Account hero card */
+.account-hero-bg { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 55%, black) 0%, color-mix(in srgb, var(--color-accent) 80%, black) 50%, var(--color-accent) 100%); }
 

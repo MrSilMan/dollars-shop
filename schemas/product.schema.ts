@@ -3,7 +3,7 @@ import { z } from "zod";
 export const ProductSchema = z.object({
   name: z.string().min(2).max(200),
   slug: z.string().min(2).max(200).regex(/^[a-z0-9-]+$/),
-  description: z.string().min(10),
+  description: z.string().min(10).optional().or(z.literal("")),
   sku: z.string().min(2).max(50),
   price: z.number().positive(),
   compareAtPrice: z.number().positive().nullable().optional(),
