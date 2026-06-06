@@ -111,7 +111,7 @@ export default async function ProductPage({ params }: Props) {
           {/* Accordion info */}
           <details className="border border-(--color-border) rounded-xl overflow-hidden">
             <summary className="px-4 py-3 font-medium cursor-pointer select-none hover:bg-(--color-surface-alt) transition-colors">Description</summary>
-            <p className="px-4 py-3 text-sm text-(--color-text-muted) border-t border-(--color-border)">{product.description}</p>
+            <p className="px-4 py-3 text-sm text-(--color-text-muted) border-t border-(--color-border) whitespace-pre-line">{product.description}</p>
           </details>
           <details className="border border-(--color-border) rounded-xl overflow-hidden">
             <summary className="px-4 py-3 font-medium cursor-pointer select-none hover:bg-(--color-surface-alt) transition-colors">Delivery Info</summary>

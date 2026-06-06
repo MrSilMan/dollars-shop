@@ -48,7 +48,8 @@ const CouponSchema = z.object({
 
 export async function createCoupon(data: unknown) {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
 
   const parsed = CouponSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -67,7 +68,8 @@ export async function createCoupon(data: unknown) {
 
 export async function updateCoupon(id: string, data: unknown) {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
 
   const parsed = CouponSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -89,7 +91,8 @@ export async function updateCoupon(id: string, data: unknown) {
 
 export async function deleteCoupon(id: string) {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
 
   await prisma.coupon.delete({ where: { id } });
   revalidatePath("/admin/coupons");
@@ -98,6 +101,7 @@ export async function deleteCoupon(id: string) {
 
 export async function getAllCoupons() {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return [];
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return [];
   return prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
 }

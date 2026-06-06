@@ -12,7 +12,8 @@ type OrderStatus = typeof VALID_STATUSES[number];
 
 export async function updateOrderStatus(orderId: string, newStatus: OrderStatus) {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -20,10 +21,15 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
   });
   if (!order) return { error: "Order not found" };
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: newStatus },
-  });
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: newStatus },
+    });
+  } catch (err) {
+    logger.error("Order status update failed", { err, orderId });
+    return { error: "Failed to update order status" };
+  }
 
   revalidatePath("/admin/orders");
 
@@ -58,7 +64,8 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
 
 export async function markCODPaymentReceived(orderId: string) {
   const session = await auth();
-  if ((session?.user as { role?: string })?.role !== "ADMIN") return { error: "Unauthorized" };
+  const role = (session?.user as { role?: string })?.role;
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -68,15 +75,21 @@ export async function markCODPaymentReceived(orderId: string) {
   if (order.paymentMethod !== "CASH_ON_DELIVERY") return { error: "Not a Cash on Delivery order" };
   if (order.paymentStatus === "PAID") return { error: "Payment already marked as received" };
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: "PAID",
-      ...(order.status !== "DELIVERED" && order.status !== "CANCELLED" && order.status !== "REFUNDED"
-        ? { status: "DELIVERED" }
-        : {}),
-    },
-  });
+  const willMarkDelivered = order.status !== "DELIVERED" && order.status !== "CANCELLED" && order.status !== "REFUNDED";
+  const resultingStatus = willMarkDelivered ? "DELIVERED" : order.status;
+
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: "PAID",
+        ...(willMarkDelivered ? { status: "DELIVERED" } : {}),
+      },
+    });
+  } catch (err) {
+    logger.error("COD payment update failed", { err, orderId });
+    return { error: "Failed to update payment status" };
+  }
 
   revalidatePath("/admin/orders");
 
@@ -90,7 +103,7 @@ export async function markCODPaymentReceived(orderId: string) {
       orderNumber: order.orderNumber,
       customerName,
       customerEmail,
-      newStatus: "DELIVERED",
+      newStatus: resultingStatus,
       total,
     }).catch(err => logger.error("Status email failed", { err, orderId }));
   }
@@ -99,7 +112,7 @@ export async function markCODPaymentReceived(orderId: string) {
     sendWhatsAppStatusUpdate({
       phone: customerPhone,
       orderNumber: order.orderNumber,
-      status: "DELIVERED",
+      status: resultingStatus,
       total,
     }).catch(err => logger.error("WhatsApp notification failed", { err, orderId }));
   }

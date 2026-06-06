@@ -139,6 +139,7 @@ export function CheckoutForm({
   };
 
   const submitOrder = form.handleSubmit(async (data) => {
+    if (orderId) return; // prevent double-submit if already created an order
     setLoading(true);
     setError(null);
     try {
@@ -184,6 +185,8 @@ export function CheckoutForm({
         qrCode={paymentResult.qrCode}
         transactionRef={paymentResult.transactionRef}
         customerPhone={form.getValues("innbucksNumber") || form.getValues("phone")}
+        onSuccess={() => router.push(`/checkout/success?order=${orderId}`)}
+        onFailed={() => setError("Payment failed. Please try again.")}
       />
     );
   }

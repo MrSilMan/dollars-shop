@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 const STATUS_MESSAGES: Record<string, string> = {
   CONFIRMED:  "✅ Your Dollar Shop order *{orderNumber}* has been confirmed! Total: *${total}*. We'll keep you posted.",
   PROCESSING: "📦 Your order *{orderNumber}* is being packed and prepared for dispatch.",
@@ -27,7 +29,7 @@ export async function sendWhatsAppStatusUpdate(params: {
   // Normalise phone: strip leading 0, prepend country code 263
   const normalised = params.phone.replace(/^\+/, "").replace(/^0/, "263");
 
-  await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+  const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -40,4 +42,12 @@ export async function sendWhatsAppStatusUpdate(params: {
       text: { body },
     }),
   });
+
+  if (!response.ok) {
+    logger.error("WhatsApp message delivery failed", {
+      status: response.status,
+      body: await response.text().catch(() => ""),
+      phone: normalised,
+    });
+  }
 }

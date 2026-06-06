@@ -8,7 +8,7 @@ import { z } from "zod";
 async function requireAdmin() {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) throw new Error("Unauthorized");
 }
 
 // ─── Hero Slides ────────────────────────────────────────────────────────────

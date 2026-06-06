@@ -74,5 +74,5 @@ export async function verifyInnBucksWebhook(
     .update(JSON.stringify(payload))
     .digest("hex");
 
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(signature, "hex"));
 }

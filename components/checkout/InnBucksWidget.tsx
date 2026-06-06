@@ -1,9 +1,15 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatUSD } from "@/lib/utils/currency";
 import Image from "next/image";
-import { Loader2, Smartphone, QrCode } from "lucide-react";
+import { Loader2, Smartphone, QrCode, CheckCircle, XCircle, MessageCircle } from "lucide-react";
+
+async function pollInnBucksStatus(transactionRef: string) {
+  const res = await fetch(`/api/payment/status/innbucks/${transactionRef}`);
+  const data = await res.json();
+  return data.status as "PENDING" | "PAID" | "FAILED";
+}
 
 interface InnBucksWidgetProps {
   orderId: string;
@@ -11,10 +17,88 @@ interface InnBucksWidgetProps {
   qrCode?: string;
   transactionRef: string;
   customerPhone?: string;
+  onSuccess: () => void;
+  onFailed: () => void;
 }
 
-export function InnBucksWidget({ amount, qrCode, transactionRef, customerPhone }: Omit<InnBucksWidgetProps, "orderId"> & { orderId?: string }) {
+type Status = "polling" | "paid" | "failed" | "timeout";
+
+export function InnBucksWidget({ orderId, amount, qrCode, transactionRef, customerPhone, onSuccess, onFailed }: InnBucksWidgetProps) {
   const [mode, setMode] = useState<"push" | "qr">(customerPhone ? "push" : "qr");
+  const [status, setStatus] = useState<Status>("polling");
+  const [seconds, setSeconds] = useState(300);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const poll = async () => {
+      const result = await pollInnBucksStatus(transactionRef);
+      if (result === "PAID") {
+        setStatus("paid");
+        clearInterval(intervalRef.current!);
+        setTimeout(onSuccess, 1500);
+      } else if (result === "FAILED") {
+        setStatus("failed");
+        clearInterval(intervalRef.current!);
+        onFailed();
+      }
+    };
+
+    intervalRef.current = setInterval(poll, 5000);
+    const countdown = setInterval(() => {
+      setSeconds((s) => {
+        if (s <= 1) {
+          clearInterval(countdown);
+          clearInterval(intervalRef.current!);
+          setStatus("timeout");
+          onFailed();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+
+    poll();
+
+    return () => {
+      clearInterval(intervalRef.current!);
+      clearInterval(countdown);
+    };
+  }, [transactionRef, onSuccess, onFailed]);
+
+  if (status === "paid") {
+    return (
+      <div className="rounded-2xl border border-(--color-border) p-6 text-center space-y-4">
+        <CheckCircle size={40} className="text-(--color-success) mx-auto" />
+        <p className="font-semibold text-(--color-success)">Payment Received!</p>
+        <p className="text-sm text-(--color-text-muted)">Redirecting to your order confirmation…</p>
+      </div>
+    );
+  }
+
+  if (status === "failed" || status === "timeout") {
+    return (
+      <div className="rounded-2xl border border-(--color-border) p-6 text-center space-y-4">
+        <XCircle size={40} className="text-(--color-primary) mx-auto" />
+        <p className="font-semibold text-(--color-primary)">
+          {status === "timeout" ? "Payment Timed Out" : "Payment Failed"}
+        </p>
+        <p className="text-sm text-(--color-text-muted)">
+          {status === "timeout"
+            ? "The payment window expired. Please try again."
+            : "Your payment was not completed. Please try again."}
+        </p>
+        <a
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "263772566468"}?text=Hi, I need help with my order ${orderId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 bg-[#25D366] text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#1da851] transition-colors"
+        >
+          <MessageCircle size={16} />
+          Get Help on WhatsApp
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-(--color-border) p-6 space-y-4">
@@ -24,6 +108,7 @@ export function InnBucksWidget({ amount, qrCode, transactionRef, customerPhone }
         </p>
         <div className="flex bg-(--color-surface-alt) rounded-full p-0.5 gap-0.5">
           <button
+            type="button"
             onClick={() => setMode("push")}
             className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${mode === "push" ? "bg-white shadow-sm text-(--color-primary)" : "text-(--color-text-muted)"}`}
           >
@@ -31,6 +116,7 @@ export function InnBucksWidget({ amount, qrCode, transactionRef, customerPhone }
             Number Push
           </button>
           <button
+            type="button"
             onClick={() => setMode("qr")}
             className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${mode === "qr" ? "bg-white shadow-sm text-(--color-primary)" : "text-(--color-text-muted)"}`}
           >
@@ -50,7 +136,7 @@ export function InnBucksWidget({ amount, qrCode, transactionRef, customerPhone }
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-(--color-text-muted)">
             <Loader2 size={14} className="animate-spin" />
-            <span>Waiting for payment…</span>
+            <span>Waiting for payment… {seconds}s</span>
           </div>
           <p className="text-xs text-(--color-text-muted)">Ref: {transactionRef}</p>
         </div>
@@ -77,7 +163,7 @@ export function InnBucksWidget({ amount, qrCode, transactionRef, customerPhone }
           )}
           <div className="flex items-center justify-center gap-2 text-sm text-(--color-text-muted)">
             <Loader2 size={14} className="animate-spin" />
-            <span>Waiting for payment…</span>
+            <span>Waiting for payment… {seconds}s</span>
           </div>
           <p className="text-xs text-(--color-text-muted)">Ref: {transactionRef}</p>
         </div>

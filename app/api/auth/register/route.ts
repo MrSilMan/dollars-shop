@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const Schema = z.object({
   name: z.string().min(2),
@@ -30,7 +31,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logger.error("Registration failed", { err });
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -1,10 +1,9 @@
-import { prisma } from "@/lib/prisma";
+import { randomBytes } from "crypto";
 
-export async function generateOrderNumber(): Promise<string> {
+export function generateOrderNumber(): string {
   const year = new Date().getFullYear();
-  const count = await prisma.order.count({
-    where: { createdAt: { gte: new Date(`${year}-01-01`) } },
-  });
-  const seq = String(count + 1).padStart(6, "0");
-  return `DS-${year}-${seq}`;
+  // Timestamp (ms) + 3 random bytes = collision-resistant without a DB round-trip
+  const ts = Date.now().toString(36).toUpperCase().slice(-5);
+  const rand = randomBytes(3).toString("hex").toUpperCase();
+  return `DS-${year}-${ts}${rand}`;
 }

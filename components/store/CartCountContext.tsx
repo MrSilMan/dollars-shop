@@ -7,6 +7,8 @@ interface CartCountCtxValue {
   wishlistCount: number;
   incCart: () => void;
   decCart: () => void;
+  incWishlist: () => void;
+  decWishlist: () => void;
 }
 
 const CartCountContext = createContext<CartCountCtxValue>({
@@ -14,6 +16,8 @@ const CartCountContext = createContext<CartCountCtxValue>({
   wishlistCount: 0,
   incCart: () => {},
   decCart: () => {},
+  incWishlist: () => {},
+  decWishlist: () => {},
 });
 
 export function CartCountProvider({
@@ -26,19 +30,26 @@ export function CartCountProvider({
   children: ReactNode;
 }) {
   const [cartCount, setCartCount] = useState(initialCartCount);
+  const [wishlistCount, setWishlistCount] = useState(initialWishlistCount);
 
-  // Sync with server-side count when layout re-renders (e.g. after navigation)
+  // Sync with server-side counts when layout re-renders (e.g. after navigation)
   useEffect(() => {
     setCartCount(initialCartCount);
   }, [initialCartCount]);
+
+  useEffect(() => {
+    setWishlistCount(initialWishlistCount);
+  }, [initialWishlistCount]);
 
   return (
     <CartCountContext.Provider
       value={{
         cartCount,
-        wishlistCount: initialWishlistCount,
+        wishlistCount,
         incCart: () => setCartCount((c) => c + 1),
         decCart: () => setCartCount((c) => Math.max(0, c - 1)),
+        incWishlist: () => setWishlistCount((c) => c + 1),
+        decWishlist: () => setWishlistCount((c) => Math.max(0, c - 1)),
       }}
     >
       {children}

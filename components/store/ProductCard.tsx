@@ -7,7 +7,6 @@ import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
 import { getStockStatus, stockLabel } from "@/lib/utils/stock";
 import { useCart } from "@/hooks/useCart";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 interface Product {
   id: string;
@@ -31,12 +30,10 @@ export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: Pro
   const { add, isPending } = useCart();
   const [justAdded, setJustAdded] = useState(false);
   const [wishPending, startWish] = useTransition();
-  const router = useRouter();
 
   const handleAdd = async () => {
     await add(product.id, 1);
     setJustAdded(true);
-    router.refresh();
     setTimeout(() => setJustAdded(false), 2000);
   };
 

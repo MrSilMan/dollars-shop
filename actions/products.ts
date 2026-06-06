@@ -135,7 +135,7 @@ export async function updateProduct(id: string, data: Partial<ProductFormData>) 
 export async function deleteProduct(id: string) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
 
   const product = await prisma.product.update({
     where: { id },
@@ -164,7 +164,7 @@ export async function getProductVariants(productId: string) {
 export async function upsertVariants(productId: string, variants: { id?: string; groupName: string; value: string; sku?: string; stock: number; priceAdjust: number; sortOrder: number }[]) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "ADMIN") return { error: "Unauthorized" };
+  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
 
   await prisma.$transaction(async (tx) => {
     const incoming = variants.filter(v => v.id);

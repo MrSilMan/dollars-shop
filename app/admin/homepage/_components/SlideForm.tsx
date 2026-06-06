@@ -105,11 +105,13 @@ export function SlideForm({ slide, onDone }: Props) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving || uploading) return;
     setSaving(true);
     setError("");
     try {

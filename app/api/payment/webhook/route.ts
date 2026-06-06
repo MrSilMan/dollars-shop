@@ -5,8 +5,15 @@ import { verifyInnBucksWebhook } from "@/lib/payments/innbucks";
 import { verifyEcoCashWebhook } from "@/lib/payments/ecocash";
 import { sendPaymentReceivedEmail, type OrderEmailData } from "@/lib/email";
 
+const VALID_PROVIDERS = ["innbucks", "ecocash"] as const;
+
 export async function POST(req: NextRequest) {
   const provider = req.nextUrl.searchParams.get("provider");
+
+  if (!provider || !(VALID_PROVIDERS as readonly string[]).includes(provider)) {
+    return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+  }
+
   const body = await req.json();
 
   try {

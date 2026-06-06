@@ -75,13 +75,18 @@
       "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next:', p.dependencies.next\\)\")",
       "Bash(del \"c:\\\\Users\\\\USER\\\\Documents\\\\DOCS\\\\SoftWise\\\\Softwise-Proj\\\\Dollar-Shop-App\\\\dollar-shop\\\\middleware.ts\")",
       "Skill(claude-api)",
-      "Skill(claude-api:*)"
+      "Skill(claude-api:*)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(mkdir -p \"c:/Users/USER/Documents/DOCS/SoftWise/Softwise-Proj/Dollar-Shop-App/dollar-shop/app/api/payment/status/innbucks/[transactionRef]\")",
+      "Bash(git stash *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\lib",
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\app\\(store)\\shop",
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\app\\(store)\\product\\[slug]",
-      "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop"
+      "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop",
+      "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\app\\api\\payment\\status\\innbucks"
     ]
   }
 }

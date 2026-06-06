@@ -71,9 +71,9 @@ export function verifyEcoCashWebhook(token: string): boolean {
   if (isSandbox) return true;
   const secret = process.env.ECOCASH_WEBHOOK_SECRET ?? "";
   if (!secret) return false;
-  // Hash both to equal-length buffers so timingSafeEqual works regardless of input length
-  const h1 = crypto.createHmac("sha256", "verify").update(token).digest();
-  const h2 = crypto.createHmac("sha256", "verify").update(secret).digest();
+  // Hash both to equal-length 32-byte buffers for timing-safe comparison
+  const h1 = crypto.createHash("sha256").update(token).digest();
+  const h2 = crypto.createHash("sha256").update(secret).digest();
   return crypto.timingSafeEqual(h1, h2);
 }
 

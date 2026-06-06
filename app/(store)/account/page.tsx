@@ -39,7 +39,8 @@ export default async function AccountPage() {
   const recentOrders = orders.slice(0, 3);
   const totalSpent = orders.reduce((s, o) => s + toNumber(o.total), 0);
   const initials = ((user?.name ?? session.user.email ?? "?")
-    .split(" ")
+    .trim()
+    .split(/\s+/)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")

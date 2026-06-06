@@ -15,11 +15,22 @@ redis.on("error", () => {
 
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
 
+async function scanKeys(pattern: string): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor = "0";
+  do {
+    const [next, found] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+    cursor = next;
+    keys.push(...found);
+  } while (cursor !== "0");
+  return keys;
+}
+
 export async function invalidateProductCache(productSlug: string, categorySlug?: string) {
   const keys: string[] = [`product:${productSlug}`, "products:featured"];
 
   if (categorySlug) {
-    const categoryKeys = await redis.keys(`products:category:${categorySlug}:*`);
+    const categoryKeys = await scanKeys(`products:category:${categorySlug}:*`);
     keys.push(...categoryKeys);
   }
 
@@ -40,5 +51,16 @@ export async function setCached(key: string, value: unknown, ttlSeconds: number)
     await redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
   } catch {
     // silently fail — cache is optional
+  }
+}
+
+/** Fixed-window rate limiter. Returns true if the request is allowed. Fails open if Redis is unavailable. */
+export async function checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, windowSeconds);
+    return count <= limit;
+  } catch {
+    return true;
   }
 }

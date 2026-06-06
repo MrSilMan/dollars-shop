@@ -3,10 +3,12 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useCartCount } from "@/components/store/CartCountContext";
 
 export function useWishlist() {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { incWishlist, decWishlist } = useCartCount();
 
   const toggle = (productId: string, productName?: string) => {
     startTransition(async () => {
@@ -21,8 +23,10 @@ export function useWishlist() {
       }
       const data = await res.json();
       if (data.wishlisted) {
+        incWishlist();
         toast.success(productName ? `"${productName}" added to wishlist` : "Added to wishlist");
       } else {
+        decWishlist();
         toast.info(productName ? `"${productName}" removed from wishlist` : "Removed from wishlist");
       }
     });

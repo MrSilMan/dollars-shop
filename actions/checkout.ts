@@ -36,97 +36,120 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
   const total = Math.max(0, subtotal + deliveryFee - discount);
 
   try {
-    const orderNumber = await generateOrderNumber();
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId: session?.user?.id ?? null,
-        guestEmail: session ? null : parsed.data.email,
-        guestPhone: session ? null : parsed.data.phone,
-        paymentMethod: parsed.data.method as "ECOCASH" | "INNBUCKS" | "CASH_ON_DELIVERY",
-        status: parsed.data.method === "CASH_ON_DELIVERY" ? "PENDING" : "PENDING",
-        paymentStatus: parsed.data.method === "CASH_ON_DELIVERY" ? "UNPAID" : "UNPAID",
-        subtotal,
-        deliveryFee,
-        discount,
-        total,
-        couponId: parsed.data.couponId ?? null,
-        couponCode: parsed.data.couponCode ?? null,
-        shippingAddress: {
-          name: parsed.data.name,
-          email: parsed.data.email,
-          phone: parsed.data.phone,
-          line1: parsed.data.line1,
-          line2: parsed.data.line2 ?? null,
-          city: parsed.data.city,
-          province: parsed.data.province,
-          country: "Zimbabwe",
-        },
-        items: {
-          create: cartItems.map((item) => ({
-            productId: item.productId,
-            productName: item.product.name,
-            productSku: item.product.sku,
-            price: item.product.price,
-            quantity: item.quantity,
-            subtotal: Number(item.product.price) * item.quantity,
-            variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
-          })),
-        },
-      },
-    });
+    const orderNumber = generateOrderNumber();
 
-    // Increment coupon usage
-    if (parsed.data.couponId) {
-      await prisma.coupon.update({
-        where: { id: parsed.data.couponId },
-        data: { usedCount: { increment: 1 } },
+    const order = await prisma.$transaction(async (tx) => {
+      // Re-validate coupon inside the transaction to prevent TOCTOU races
+      if (parsed.data.couponId) {
+        const coupon = await tx.coupon.findUnique({ where: { id: parsed.data.couponId } });
+        if (!coupon || !coupon.isActive) throw new Error("Coupon is no longer valid");
+        if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
+          throw new Error("Coupon has reached its usage limit");
+        }
+        await tx.coupon.update({
+          where: { id: parsed.data.couponId },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+
+      const newOrder = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: session?.user?.id ?? null,
+          guestEmail: session ? null : parsed.data.email,
+          guestPhone: session ? null : parsed.data.phone,
+          paymentMethod: parsed.data.method as "ECOCASH" | "INNBUCKS" | "CASH_ON_DELIVERY",
+          status: "PENDING",
+          paymentStatus: "UNPAID",
+          subtotal,
+          deliveryFee,
+          discount,
+          total,
+          couponId: parsed.data.couponId ?? null,
+          couponCode: parsed.data.couponCode ?? null,
+          shippingAddress: {
+            name: parsed.data.name,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            line1: parsed.data.line1,
+            line2: parsed.data.line2 ?? null,
+            city: parsed.data.city,
+            province: parsed.data.province,
+            country: "Zimbabwe",
+          },
+          items: {
+            create: cartItems.map((item) => ({
+              productId: item.productId,
+              productName: item.product.name,
+              productSku: item.product.sku,
+              price: item.product.price,
+              quantity: item.quantity,
+              subtotal: Number(item.product.price) * item.quantity,
+              variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
+            })),
+          },
+        },
       });
-    }
 
-    // For COD: decrement stock immediately and clear cart
-    if (parsed.data.method === "CASH_ON_DELIVERY") {
-      await prisma.$transaction(async (tx) => {
+      // COD: check stock and decrement atomically inside the same transaction
+      if (parsed.data.method === "CASH_ON_DELIVERY") {
         for (const item of cartItems) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { stock: true, name: true },
+          });
+          if (!product || product.stock < item.quantity) {
+            throw new Error(`Insufficient stock for "${item.product.name}"`);
+          }
           await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
           });
         }
-      });
+      }
+
+      return newOrder;
+    });
+
+    if (parsed.data.method === "CASH_ON_DELIVERY") {
       await clearCart();
     }
 
     logger.info("Order created", { orderId: order.id, orderNumber, total });
 
-    // Send confirmation email (fire-and-forget)
-    const emailData: OrderEmailData = {
-      orderNumber,
-      customerName: parsed.data.name,
-      customerEmail: parsed.data.email,
-      items: cartItems.map(item => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        price: Number(item.product.price),
-        variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
-      })),
-      subtotal,
-      deliveryFee,
-      discount,
-      total,
-      paymentMethod: parsed.data.method,
-      shippingAddress: {
-        line1: parsed.data.line1,
-        line2: parsed.data.line2,
-        city: parsed.data.city,
-        province: parsed.data.province,
-      },
-    };
-    sendOrderConfirmationEmail(emailData).catch(() => {});
+    // Only send confirmation email for COD — EcoCash/InnBucks orders are not yet paid
+    if (parsed.data.method === "CASH_ON_DELIVERY") {
+      const emailData: OrderEmailData = {
+        orderNumber,
+        customerName: parsed.data.name,
+        customerEmail: parsed.data.email,
+        items: cartItems.map(item => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: Number(item.product.price),
+          variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
+        })),
+        subtotal,
+        deliveryFee,
+        discount,
+        total,
+        paymentMethod: parsed.data.method,
+        shippingAddress: {
+          line1: parsed.data.line1,
+          line2: parsed.data.line2,
+          city: parsed.data.city,
+          province: parsed.data.province,
+        },
+      };
+      sendOrderConfirmationEmail(emailData).catch(() => {});
+    }
 
     return { orderId: order.id, orderNumber };
   } catch (error) {
     logger.error("Order creation failed", { error });
+    if (error instanceof Error && (error.message.startsWith("Coupon") || error.message.startsWith("Insufficient"))) {
+      return { error: error.message };
+    }
     return { error: "Failed to create order" };
   }
 }

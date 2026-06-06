@@ -19,7 +19,7 @@ export function useCart() {
       if (!result.success) setMessage(result.error ?? "Error");
       else {
         setMessage(null);
-        incCart();
+        if (result.isNewItem) incCart();
       }
     } finally {
       inFlightRef.current = false;

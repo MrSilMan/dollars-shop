@@ -34,12 +34,15 @@ export default async function AdminDashboard() {
         include: { user: { select: { name: true, email: true } } },
       }),
       prisma.$queryRaw<{ date: string; revenue: number }[]>`
-        SELECT DATE(created_at)::text as date, SUM(total)::float as revenue
+        SELECT DATE("createdAt")::text as date, SUM(total)::float as revenue
         FROM orders
-        WHERE payment_status = 'PAID' AND created_at >= NOW() - INTERVAL '30 days'
-        GROUP BY DATE(created_at)
+        WHERE "paymentStatus" = 'PAID' AND "createdAt" >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE("createdAt")
         ORDER BY date ASC
-      `.catch(() => []),
+      `.catch((err) => {
+        console.error("Failed to load revenue chart data:", err);
+        return [];
+      }),
     ]);
 
   const now = new Date();

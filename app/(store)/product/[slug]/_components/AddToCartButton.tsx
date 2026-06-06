@@ -31,7 +31,11 @@ export function AddToCartButton({ productId, stock, variants = [] }: AddToCartBu
   }, {});
   const groupNames = Object.keys(groups);
 
-  const selectedVariantId = groupNames.length === 1
+  const allGroupsSelected = groupNames.every(g => selectedVariants[g]);
+  const needsVariantSelection = groupNames.length > 0 && !allGroupsSelected;
+
+  // Resolve the selected variant object for the first group (primary for stock/price)
+  const selectedVariantId = allGroupsSelected && groupNames.length > 0
     ? selectedVariants[groupNames[0]]
     : undefined;
 
@@ -42,9 +46,6 @@ export function AddToCartButton({ productId, stock, variants = [] }: AddToCartBu
       ? selectedVariantObj.priceAdjust
       : selectedVariantObj.priceAdjust.toNumber()
     : 0;
-
-  const allGroupsSelected = groupNames.every(g => selectedVariants[g]);
-  const needsVariantSelection = groupNames.length > 0 && !allGroupsSelected;
 
   const handleAdd = () => {
     const variantId = groupNames.length > 0 ? selectedVariantId : undefined;
@@ -59,19 +60,21 @@ export function AddToCartButton({ productId, stock, variants = [] }: AddToCartBu
           <p className="text-sm font-medium mb-2">
             {groupName}
             {selectedVariants[groupName] && (
-              <span className="text-(--color-text-muted) font-normal ml-1">— {selectedVariants[groupName]}</span>
+              <span className="text-(--color-text-muted) font-normal ml-1">
+                — {variants.find(v => v.id === selectedVariants[groupName])?.value}
+              </span>
             )}
           </p>
           <div className="flex flex-wrap gap-2">
             {groups[groupName].map(v => {
-              const selected = selectedVariants[groupName] === v.value;
+              const selected = selectedVariants[groupName] === v.id;
               const outOfStock = v.stock === 0;
               return (
                 <button
                   key={v.id}
                   type="button"
                   disabled={outOfStock}
-                  onClick={() => setSelectedVariants(prev => ({ ...prev, [groupName]: v.value }))}
+                  onClick={() => setSelectedVariants(prev => ({ ...prev, [groupName]: v.id }))}
                   className={`px-3.5 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors relative
                     ${selected
                       ? "border-(--color-primary) bg-(--color-primary-light) text-(--color-primary)"
@@ -114,6 +117,7 @@ export function AddToCartButton({ productId, stock, variants = [] }: AddToCartBu
           </button>
         </div>
         <button
+          type="button"
           onClick={handleAdd}
           disabled={isPending || effectiveStock === 0 || needsVariantSelection}
           className="flex-1 flex items-center justify-center gap-2 bg-(--color-primary) hover:bg-(--color-primary-dark) disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition-colors text-sm"
