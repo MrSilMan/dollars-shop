@@ -79,7 +79,9 @@
       "Skill(code-review)",
       "Skill(code-review:*)",
       "Bash(mkdir -p \"c:/Users/USER/Documents/DOCS/SoftWise/Softwise-Proj/Dollar-Shop-App/dollar-shop/app/api/payment/status/innbucks/[transactionRef]\")",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(dir -la)",
+      "Bash(Select-String '\"next\"')"
     ],
     "additionalDirectories": [
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\lib",

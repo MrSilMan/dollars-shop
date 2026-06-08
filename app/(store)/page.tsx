@@ -2,10 +2,17 @@ import type { Metadata } from "next";
 import { HeroSection } from "@/components/store/HeroSection";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { FlashSaleTimer } from "@/components/store/FlashSaleTimer";
-import { getFeaturedProducts, getFlashDeals, getAllCategories } from "@/actions/products";
+import { HomePagination } from "@/components/store/HomePagination";
+import {
+  getFeaturedProducts,
+  getFlashDeals,
+  getAllCategories,
+  getNewArrivals,
+  getAllProductsPaginated,
+} from "@/actions/products";
 import { getActiveHeroSlides, getActiveSidePromos, getActivePromoCards } from "@/actions/homepage";
 import Link from "next/link";
-import { ShieldCheck, Truck, MessageCircle, ShoppingBasket, LayoutGrid } from "lucide-react";
+import { ShieldCheck, Truck, MessageCircle, ShoppingBasket, LayoutGrid, Package, Users, Star, Zap } from "lucide-react";
 import { NewsletterSection } from "@/components/store/NewsletterSection";
 import { categoryIconMap as slugIconMap, categoryColorMap as slugColorMap } from "@/lib/categories";
 
@@ -23,16 +30,29 @@ const DEFAULT_PROMO_CARDS: PromoCardData[] = [
   { id: "d4", amount: "⚡", label: "FLASH", desc: "Flash Deals Today", sub: "While stocks last", href: "/shop", leftBg: "bg-linear-to-b from-(--color-primary) to-(--color-primary-dark)", rightBg: "bg-(--color-primary-light)" },
 ];
 
-export default async function HomePage() {
-  const [featured, flashDeals, categories, heroSlides, sidePromos, rawPromoCards] = await Promise.all([
-    getFeaturedProducts(),
-    getFlashDeals(),
-    getAllCategories(),
-    getActiveHeroSlides(),
-    getActiveSidePromos(),
-    getActivePromoCards(),
-  ]);
+const PAGE_SIZE = 12;
 
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(String(pageParam ?? "1"), 10) || 1);
+
+  const [featured, flashDeals, categories, heroSlides, sidePromos, rawPromoCards, newArrivals, { products: allProducts, total }] =
+    await Promise.all([
+      getFeaturedProducts(),
+      getFlashDeals(),
+      getAllCategories(),
+      getActiveHeroSlides(),
+      getActiveSidePromos(),
+      getActivePromoCards(),
+      getNewArrivals(8),
+      getAllProductsPaginated(page, PAGE_SIZE),
+    ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
   const promoCards: PromoCardData[] = rawPromoCards.length > 0 ? rawPromoCards : DEFAULT_PROMO_CARDS;
 
   return (
@@ -60,6 +80,28 @@ export default async function HomePage() {
             </div>
           </Link>
         ))}
+      </section>
+
+      {/* ── Stats bar ── */}
+      <section className="bg-white rounded-xl border border-(--color-border) overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-(--color-border)">
+          {[
+            { icon: Package, value: `${total}+`, label: "Products" },
+            { icon: Star, value: "5-Star", label: "Rated Quality" },
+            { icon: Zap, value: "Flash", label: "Deals Daily" },
+            { icon: Users, value: "1,000+", label: "Happy Customers" },
+          ].map(({ icon: Icon, value, label }) => (
+            <div key={label} className="flex items-center gap-3 px-4 py-3">
+              <div className="w-9 h-9 bg-(--color-primary-light) rounded-lg flex items-center justify-center shrink-0">
+                <Icon size={18} className="text-(--color-primary)" />
+              </div>
+              <div>
+                <p className="font-black text-sm text-(--color-primary) leading-none">{value}</p>
+                <p className="text-[10px] text-(--color-text-muted) mt-0.5">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ── Category icon grid ── */}
@@ -125,6 +167,24 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* ── New Arrivals ── */}
+      {newArrivals.length > 0 && (
+        <section className="bg-white rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-(--color-border)">
+            <h2 className="font-black text-(--color-text-primary) flex items-center gap-2 text-sm sm:text-base">
+              <span className="inline-block w-1 h-5 bg-(--color-accent) rounded-full" aria-hidden="true" />
+              New Arrivals
+            </h2>
+            <Link href="/shop" className="text-xs font-bold text-(--color-primary) hover:underline">
+              View All →
+            </Link>
+          </div>
+          <div className="p-3">
+            <ProductGrid products={newArrivals as Parameters<typeof ProductGrid>[0]["products"]} />
+          </div>
+        </section>
+      )}
+
       {/* ── Featured Products ── */}
       {featured.length > 0 && (
         <section className="bg-white rounded-xl overflow-hidden">
@@ -148,6 +208,32 @@ export default async function HomePage() {
 
       {/* ── Newsletter ── */}
       <NewsletterSection />
+
+      {/* ── Browse All Products (paginated) ── */}
+      <section id="browse-all" className="bg-white rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-(--color-border)">
+          <div>
+            <h2 className="font-black text-(--color-text-primary) flex items-center gap-2 text-sm sm:text-base">
+              <span className="inline-block w-1 h-5 bg-(--color-primary) rounded-full" aria-hidden="true" />
+              Browse All Products
+            </h2>
+            <p className="text-[11px] text-(--color-text-muted) mt-0.5">{total} products in store</p>
+          </div>
+          <Link href="/shop" className="text-xs font-bold text-(--color-primary) hover:underline">
+            Full Catalogue →
+          </Link>
+        </div>
+        <div className="p-3">
+          <ProductGrid products={allProducts as Parameters<typeof ProductGrid>[0]["products"]} />
+        </div>
+        <HomePagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={PAGE_SIZE}
+          anchor="browse-all"
+        />
+      </section>
 
       {/* ── Trust bar ── */}
       <section className="bg-white rounded-2xl shadow-sm border border-(--color-border) overflow-hidden">

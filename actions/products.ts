@@ -239,3 +239,32 @@ export async function getFlashDeals() {
   });
   return products.map(serializeProduct);
 }
+
+export async function getNewArrivals(limit = 8) {
+  const products = await withCache(`products:new-arrivals:${limit}`, 1800, () =>
+    prisma.product.findMany({
+      where: { isActive: true, featured: false },
+      include: { category: true },
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    })
+  );
+  return products.map(serializeProduct);
+}
+
+export async function getAllProductsPaginated(page = 1, limit = 12) {
+  const result = await withCache(`products:all-paginated:${page}:${limit}`, 1800, async () => {
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: { isActive: true },
+        include: { category: true },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.product.count({ where: { isActive: true } }),
+    ]);
+    return { products, total };
+  });
+  return { ...result, products: result.products.map(serializeProduct) };
+}
