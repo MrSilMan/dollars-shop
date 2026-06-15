@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { canAccess } from "@/lib/permissions";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import type { NextRequest } from "next/server";
@@ -14,7 +15,7 @@ function detectMimeType(buf: Buffer): string | null {
 export async function POST(req: NextRequest) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) {
+  if (!session || !canAccess("products", user?.role ?? "")) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

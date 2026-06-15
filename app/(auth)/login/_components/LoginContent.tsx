@@ -6,9 +6,8 @@ import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema, type LoginFormData } from "@/schemas/user.schema";
-import { signIn, getSession } from "next-auth/react";
-import { mergeGuestCart } from "@/actions/cart";
-import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck, Zap, Gift } from "lucide-react";
 
 const GoogleIcon = () => (
@@ -30,7 +29,6 @@ function LoginForm({ logoUrl, appName }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
 
@@ -46,20 +44,14 @@ function LoginForm({ logoUrl, appName }: Props) {
       setError("Invalid email or password. Please try again.");
       setLoading(false);
     } else {
-      await mergeGuestCart();
-      const session = await getSession();
-      const role = (session?.user as { role?: string })?.role;
-      const dest =
-        role === "SUPER_ADMIN" ? "/super-admin/settings" :
-        role === "ADMIN"       ? "/admin"                :
-        callbackUrl;
-      router.push(dest);
+      window.location.href = `/api/admin-redirect?fallback=${encodeURIComponent(callbackUrl)}`;
     }
   };
 
   const handleGoogleSignIn = () => {
     setGoogleLoading(true);
-    signIn("google", { callbackUrl });
+    const redirectUrl = `/api/admin-redirect?fallback=${encodeURIComponent(callbackUrl)}`;
+    signIn("google", { callbackUrl: redirectUrl });
   };
 
   return (

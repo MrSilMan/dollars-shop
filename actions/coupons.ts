@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { canAccess } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 export type CouponValidationResult =
   | { valid: true; couponId: string; code: string; type: "PERCENTAGE" | "FIXED"; value: number; discountAmount: number }
@@ -48,8 +50,8 @@ const CouponSchema = z.object({
 
 export async function createCoupon(data: unknown) {
   const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!canAccess("coupons", actor?.role ?? "")) return { error: "Unauthorized" };
 
   const parsed = CouponSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -59,6 +61,7 @@ export async function createCoupon(data: unknown) {
       ...parsed.data,
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
     }});
+    logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: actor?.role, action: "COUPON_CREATE", entity: "coupon", entityId: coupon.id, entityLabel: coupon.code });
     revalidatePath("/admin/coupons");
     return { coupon: { ...coupon, value: Number(coupon.value), minOrder: coupon.minOrder ? Number(coupon.minOrder) : null } };
   } catch {
@@ -68,8 +71,8 @@ export async function createCoupon(data: unknown) {
 
 export async function updateCoupon(id: string, data: unknown) {
   const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!canAccess("coupons", actor?.role ?? "")) return { error: "Unauthorized" };
 
   const parsed = CouponSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -82,6 +85,7 @@ export async function updateCoupon(id: string, data: unknown) {
         expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
       },
     });
+    logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: actor?.role, action: "COUPON_UPDATE", entity: "coupon", entityId: coupon.id, entityLabel: coupon.code });
     revalidatePath("/admin/coupons");
     return { coupon: { ...coupon, value: Number(coupon.value), minOrder: coupon.minOrder ? Number(coupon.minOrder) : null } };
   } catch {
@@ -91,10 +95,12 @@ export async function updateCoupon(id: string, data: unknown) {
 
 export async function deleteCoupon(id: string) {
   const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!canAccess("coupons", actor?.role ?? "")) return { error: "Unauthorized" };
 
+  const coupon = await prisma.coupon.findUnique({ where: { id }, select: { code: true } });
   await prisma.coupon.delete({ where: { id } });
+  logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: actor?.role, action: "COUPON_DELETE", entity: "coupon", entityId: id, entityLabel: coupon?.code });
   revalidatePath("/admin/coupons");
   return { success: true };
 }
@@ -102,6 +108,6 @@ export async function deleteCoupon(id: string) {
 export async function getAllCoupons() {
   const session = await auth();
   const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return [];
+  if (!canAccess("coupons", role ?? "")) return [];
   return prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
 }

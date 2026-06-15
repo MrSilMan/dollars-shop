@@ -14,6 +14,7 @@ model User {
   phone         String?
   passwordHash  String?
   role          Role      @default(CUSTOMER)
+  isActive      Boolean   @default(true)
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -23,12 +24,30 @@ model User {
   cartItems     CartItem[]
   wishlistItems WishlistItem[]
   reviews       Review[]
+  invitesSent   StaffInvitation[] @relation("SentInvitations")
 
   @@map("users")
 }
 
+model StaffInvitation {
+  id        String    @id @default(cuid())
+  email     String
+  role      Role
+  token     String    @unique @default(cuid())
+  invitedBy String
+  inviter   User      @relation("SentInvitations", fields: [invitedBy], references: [id])
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("staff_invitations")
+}
+
 enum Role {
   CUSTOMER
+  INVENTORY
+  SALES
+  MANAGER
   ADMIN
   SUPER_ADMIN
 }
@@ -49,8 +68,9 @@ model AppSettings {
   faviconUrl   String?
   appName      String    @default("Dollar Shop")
   footerText   String    @default("© 2025 Dollar Shop — Quality Everyday. Every Dollar Counts.")
-  fontScale    FontScale @default(MEDIUM)
-  updatedAt    DateTime  @updatedAt
+  fontScale             FontScale @default(MEDIUM)
+  whatsappAdminNumbers  String[]  @default([])
+  updatedAt             DateTime  @updatedAt
 
   @@map("app_settings")
 }
@@ -325,4 +345,22 @@ model Coupon {
   updatedAt   DateTime    @updatedAt
 
   @@map("coupons")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorEmail  String?
+  actorRole   String?
+  action      String
+  entity      String?
+  entityId    String?
+  entityLabel String?
+  detail      Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_logs")
 }

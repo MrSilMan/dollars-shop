@@ -76,6 +76,7 @@ type Slide = {
   sub: string;
   ctaLabel: string;
   ctaHref: string;
+  ctaBg: string;
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;

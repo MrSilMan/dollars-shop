@@ -35,6 +35,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
+        // Block deactivated staff from logging in
+        if (!user.isActive && user.role !== "CUSTOMER") return null;
+
         return {
           id: user.id,
           email: user.email,
@@ -58,6 +61,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       } else if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
+      } else if (token.id) {
+        // Re-fetch on every token access to enforce isActive/role changes in real time
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, isActive: true },
+        });
+        if (dbUser) {
+          // Downgrade deactivated staff to CUSTOMER so all canAccess() checks fail
+          token.role = (!dbUser.isActive && dbUser.role !== "CUSTOMER") ? "CUSTOMER" : dbUser.role;
+        }
       }
       return token;
     },

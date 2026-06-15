@@ -6,14 +6,17 @@ import { revalidatePath } from "next/cache";
 import { sendOrderStatusUpdateEmail } from "@/lib/email";
 import { sendWhatsAppStatusUpdate } from "@/lib/notifications/whatsapp";
 import { logger } from "@/lib/logger";
+import { canAccess } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 const VALID_STATUSES = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"] as const;
 type OrderStatus = typeof VALID_STATUSES[number];
 
 export async function updateOrderStatus(orderId: string, newStatus: OrderStatus) {
   const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  const role = actor?.role;
+  if (!canAccess("orders", role ?? "")) return { error: "Unauthorized" };
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -58,14 +61,16 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
     }).catch(err => logger.error("WhatsApp notification failed", { err, orderId }));
   }
 
+  logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: role, action: "ORDER_STATUS_UPDATE", entity: "order", entityId: orderId, entityLabel: order.orderNumber, detail: { newStatus, previousStatus: order.status } });
   logger.info("Order status updated", { orderId, newStatus });
   return { success: true };
 }
 
 export async function markCODPaymentReceived(orderId: string) {
   const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") return { error: "Unauthorized" };
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  const role = actor?.role;
+  if (!canAccess("orders", role ?? "")) return { error: "Unauthorized" };
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -117,6 +122,7 @@ export async function markCODPaymentReceived(orderId: string) {
     }).catch(err => logger.error("WhatsApp notification failed", { err, orderId }));
   }
 
+  logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: role, action: "ORDER_COD_PAYMENT", entity: "order", entityId: orderId, entityLabel: order.orderNumber });
   logger.info("COD payment marked as received", { orderId });
   return { success: true };
 }

@@ -14,6 +14,7 @@ interface Order {
   createdAt: Date;
   user?: { name?: string | null; email: string } | null;
   guestEmail?: string | null;
+  shippingAddress?: unknown;
 }
 
 const statusConfig: Record<string, { badge: string; dot: string }> = {
@@ -82,7 +83,7 @@ export function OrdersTable({ orders, onRowClick }: { orders: Order[]; onRowClic
 
                 <td className="px-5 py-4">
                   <p className="font-medium text-(--color-text-primary) leading-tight">
-                    {order.user?.name ?? "Guest"}
+                    {order.user?.name ?? (order.shippingAddress as Record<string, string> | null)?.name ?? "Guest"}
                   </p>
                   <p className="text-xs text-(--color-text-muted) mt-0.5">
                     {order.user?.email ?? order.guestEmail ?? ""}

@@ -14,7 +14,12 @@ export type BotState =
   | "CHECKOUT_PROVINCE"
   | "CHECKOUT_PAYMENT_METHOD"
   | "CHECKOUT_PAYMENT_NUMBER"
-  | "AWAITING_TRACKING_NUMBER";
+  | "AWAITING_TRACKING_NUMBER"
+  // ── Admin states ──────────────────────────────────────
+  | "ADMIN_MENU"
+  | "ADMIN_AWAITING_ORDER_NUMBER"
+  | "ADMIN_ORDER_DETAIL"
+  | "ADMIN_AWAITING_STATUS_CHOICE";
 
 export interface CheckoutDraft {
   name?: string;
@@ -35,6 +40,8 @@ export interface BotSession {
   /** Last search term, so "more" can re-run the same query. */
   searchQuery?: string;
   checkout?: CheckoutDraft;
+  /** Order ID the admin is currently acting on. */
+  adminOrderId?: string;
 }
 
 const TTL_SECONDS = 30 * 60;

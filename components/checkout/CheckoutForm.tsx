@@ -11,8 +11,13 @@ import { formatUSD } from "@/lib/utils/currency";
 import {
   ChevronRight, ChevronLeft, Tag, X, Loader2, CheckCircle2,
   User, Mail, Phone, MapPin, Building2, Map, CreditCard, ClipboardList, Star,
+  ShieldCheck, Truck, BadgeCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { DeliveryProgressBar } from "@/app/(store)/cart/_components/DeliveryProgressBar";
+
+const FREE_THRESHOLD = 15;
 
 const PROVINCES = [
   "Harare","Bulawayo","Manicaland","Mashonaland Central","Mashonaland East",
@@ -195,6 +200,8 @@ export function CheckoutForm({
   const w = form.watch();
 
   return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="lg:col-span-2">
     <div className="space-y-5">
       {/* Progress stepper */}
       <div className="flex items-center gap-2">
@@ -473,6 +480,81 @@ export function CheckoutForm({
           </div>
         </form>
       </div>
+    </div>
+    </div>
+
+    {/* Order summary sidebar */}
+    <div className="lg:col-span-1">
+      <div className="bg-white border border-(--color-border) rounded-2xl p-5 space-y-4 sticky top-24 shadow-sm">
+        <h2 className="font-semibold text-base">Order Summary</h2>
+
+        {initialSubtotal < FREE_THRESHOLD && (
+          <div className="bg-(--color-accent-light) rounded-xl px-3 py-2.5 text-xs">
+            Add <strong className="price">{formatUSD(FREE_THRESHOLD - initialSubtotal)}</strong> more for free delivery!
+            <DeliveryProgressBar percent={(initialSubtotal / FREE_THRESHOLD) * 100} />
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {cartItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-3">
+              <div className="relative w-11 h-11 shrink-0 rounded-lg overflow-hidden bg-(--color-surface-alt)">
+                <Image
+                  src={item.product.images[0] ?? "/placeholder.svg"}
+                  alt={item.product.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <span className="line-clamp-2 flex-1 text-(--color-text-muted) text-xs leading-tight">
+                {item.product.name} ×{item.quantity}
+              </span>
+              <span className="price font-medium text-xs shrink-0 ml-1">
+                {formatUSD(Number(item.product.price) * item.quantity)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-(--color-border) pt-3 space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-(--color-text-muted)">Subtotal</span>
+            <span className="price">{formatUSD(initialSubtotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-(--color-text-muted)">Delivery</span>
+            <span className={`price ${deliveryFee === 0 ? "text-(--color-success) font-semibold" : ""}`}>
+              {deliveryFee === 0 ? "FREE" : formatUSD(deliveryFee)}
+            </span>
+          </div>
+          {appliedCoupon && (
+            <div className="flex justify-between text-emerald-600 font-medium">
+              <span>Discount ({appliedCoupon.code})</span>
+              <span className="price">-{formatUSD(appliedCoupon.discountAmount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-base pt-2 border-t border-(--color-border)">
+            <span>Total</span>
+            <span className="price text-(--color-primary)">{formatUSD(total)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-1.5 pt-1 border-t border-(--color-border)">
+          <div className="flex items-center gap-2 text-xs text-(--color-text-muted)">
+            <ShieldCheck size={13} className="text-(--color-success) shrink-0" />
+            <span>Secure checkout</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-(--color-text-muted)">
+            <Truck size={13} className="shrink-0" />
+            <span>Fast delivery across Zimbabwe</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-(--color-text-muted)">
+            <BadgeCheck size={13} className="shrink-0" />
+            <span>Quality guaranteed on every item</span>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   );
 }

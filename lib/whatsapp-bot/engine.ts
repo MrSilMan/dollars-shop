@@ -5,6 +5,7 @@ import { CheckoutContactSchema, CheckoutAddressSchema } from "@/schemas/checkout
 import { getSession, saveSession, resetSession, type BotSession, type CheckoutDraft } from "./session";
 import { getBotCartItems, addToBotCart, clearBotCart, botCartTotal } from "./cart";
 import { createBotOrder, findOrderForTracking, type CompleteCheckoutDraft } from "./order";
+import { handleAdminMessage } from "./admin";
 
 export type IncomingMessage =
   | { kind: "text"; text: string }
@@ -31,8 +32,25 @@ function productRow(p: { id: string; name: string; price: unknown; stock: number
   };
 }
 
+async function isAdmin(phone: string): Promise<boolean> {
+  const normalize = (p: string) => p.replace(/\D/g, "").slice(-9);
+  const normalizedPhone = normalize(phone);
+
+  const settings = await prisma.appSettings.findFirst({ select: { whatsappAdminNumbers: true } });
+  const dbNumbers: string[] = settings?.whatsappAdminNumbers ?? [];
+
+  // Fall back to env var when no numbers are configured in the DB
+  const allNumbers = dbNumbers.length > 0 ? dbNumbers : [process.env.WHATSAPP_ADMIN_NUMBER ?? ""].filter(Boolean);
+
+  return allNumbers.some((n) => normalize(n) === normalizedPhone);
+}
+
 /** Entry point — routes an inbound WhatsApp message through the menu-driven conversation. */
 export async function handleIncomingMessage(phone: string, message: IncomingMessage): Promise<void> {
+  if (await isAdmin(phone)) {
+    await handleAdminMessage(phone, message);
+    return;
+  }
   if (message.kind === "selection") {
     await handleSelection(phone, message.id);
     return;

@@ -1,14 +1,32 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { orderConfirmedHtml } from "./templates/orderConfirmed";
 import { paymentReceivedHtml } from "./templates/paymentReceived";
 import { statusUpdateHtml } from "./templates/statusUpdate";
+import { staffInviteHtml } from "./templates/staffInvite";
+import { getAppSettings } from "@/lib/app-settings";
 
-let _resend: Resend | null = null;
-function getResend() {
-  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY!);
-  return _resend;
+function getTransporter() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST,
+    port:   Number(process.env.SMTP_PORT ?? 465),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
 }
-const FROM = process.env.EMAIL_FROM ?? "Dollar Shop <orders@dollarshop.co.zw>";
+
+const FROM = process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? "Dollar Shop <noreply@dollarshop.co.zw>";
+
+function isConfigured() {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+async function send(to: string, subject: string, html: string) {
+  if (!isConfigured()) return;
+  await getTransporter().sendMail({ from: FROM, to, subject, html });
+}
 
 export interface OrderEmailData {
   orderNumber: string;
@@ -24,23 +42,11 @@ export interface OrderEmailData {
 }
 
 export async function sendOrderConfirmationEmail(data: OrderEmailData) {
-  if (!process.env.RESEND_API_KEY) return;
-  await getResend().emails.send({
-    from: FROM,
-    to: data.customerEmail,
-    subject: `Order Confirmed — ${data.orderNumber} | Dollar Shop`,
-    html: orderConfirmedHtml(data),
-  });
+  await send(data.customerEmail, `Order Confirmed — ${data.orderNumber} | Dollar Shop`, orderConfirmedHtml(data));
 }
 
 export async function sendPaymentReceivedEmail(data: OrderEmailData) {
-  if (!process.env.RESEND_API_KEY) return;
-  await getResend().emails.send({
-    from: FROM,
-    to: data.customerEmail,
-    subject: `Payment Received — ${data.orderNumber} | Dollar Shop`,
-    html: paymentReceivedHtml(data),
-  });
+  await send(data.customerEmail, `Payment Received — ${data.orderNumber} | Dollar Shop`, paymentReceivedHtml(data));
 }
 
 export async function sendOrderStatusUpdateEmail(data: {
@@ -50,11 +56,31 @@ export async function sendOrderStatusUpdateEmail(data: {
   newStatus: string;
   total: number;
 }) {
-  if (!process.env.RESEND_API_KEY) return;
-  await getResend().emails.send({
-    from: FROM,
-    to: data.customerEmail,
-    subject: `Order Update — ${data.orderNumber} | Dollar Shop`,
-    html: statusUpdateHtml(data),
-  });
+  await send(data.customerEmail, `Order Update — ${data.orderNumber} | Dollar Shop`, statusUpdateHtml(data));
+}
+
+export async function sendStaffInvitationEmail(data: {
+  to: string;
+  inviterName: string;
+  roleLabel: string;
+  role: string;
+  acceptUrl: string;
+  appName: string;
+}) {
+  const settings = await getAppSettings().catch(() => null);
+  const baseUrl = (process.env.AUTH_URL ?? "https://invgest.com").replace(/\/$/, "");
+  const rawLogo = settings?.logoUrl ?? null;
+  const logoUrl = rawLogo
+    ? rawLogo.startsWith("http") ? rawLogo : `${baseUrl}${rawLogo}`
+    : null;
+  await send(
+    data.to,
+    `You're invited to join ${data.appName}`,
+    staffInviteHtml({
+      ...data,
+      expiresHours: 48,
+      primaryColor: settings?.primaryColor ?? undefined,
+      logoUrl,
+    }),
+  );
 }

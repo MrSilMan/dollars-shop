@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { StatsCard } from "@/components/admin/StatsCard";
 import { OrdersTable } from "@/components/admin/OrdersTable";
@@ -15,10 +17,17 @@ import {
 import Link from "next/link";
 import { formatUSD } from "@/lib/utils/currency";
 import { RevenueChart } from "./_components/RevenueChart";
+import { canAccess, adminLandingPage } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Admin Dashboard | Dollar Shop" };
 
 export default async function AdminDashboard() {
+  const session = await auth();
+  const role = (session?.user as { role?: string })?.role ?? "";
+  if (role && !canAccess("dashboard", role)) {
+    const dest = adminLandingPage(role);
+    if (dest !== "/") redirect(dest);
+  }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

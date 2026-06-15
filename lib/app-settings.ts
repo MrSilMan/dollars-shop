@@ -12,6 +12,7 @@ export type AppSettingsData = {
   appName: string;
   footerText: string;
   fontScale: "SMALL" | "MEDIUM" | "LARGE";
+  whatsappAdminNumbers: string[];
   updatedAt: Date;
 };
 
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettingsData = {
   appName: "Dollar Shop",
   footerText: "© 2025 Dollar Shop — Quality Everyday. Every Dollar Counts.",
   fontScale: "MEDIUM",
+  whatsappAdminNumbers: [],
   updatedAt: new Date(0),
 };
 

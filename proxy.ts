@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { isStaff } from "@/lib/permissions";
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -11,7 +12,7 @@ export default auth((req) => {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL(`/login?callbackUrl=${nextUrl.pathname}`, req.url));
     }
-    if (role !== "ADMIN") {
+    if (!isStaff(role ?? "")) {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }

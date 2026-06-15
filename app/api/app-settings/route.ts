@@ -23,6 +23,7 @@ const UpdateSchema = z.object({
   appName: z.string().min(1).max(80).optional(),
   footerText: z.string().max(300).optional(),
   fontScale: z.enum(["SMALL", "MEDIUM", "LARGE"]).optional(),
+  whatsappAdminNumbers: z.array(z.string().max(20)).max(10).optional(),
 });
 
 export async function PUT(req: NextRequest) {

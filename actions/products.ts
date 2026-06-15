@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
+import { canAccess } from "@/lib/permissions";
 import { getCached, setCached, invalidateProductCache } from "@/lib/redis";
+import { logAudit } from "@/lib/audit";
 
 async function withCache<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T> {
   const cached = await getCached<T>(key);
@@ -93,8 +95,8 @@ export async function searchProducts(query: string) {
 
 export async function createProduct(data: ProductFormData) {
   const session = await auth();
-  const user = session?.user as { role?: string } | undefined;
-  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
 
   const parsed = ProductSchema.safeParse(data);
   if (!parsed.success) return { error: "Invalid data" };
@@ -108,6 +110,8 @@ export async function createProduct(data: ProductFormData) {
     },
   });
 
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "PRODUCT_CREATE", entity: "product", entityId: product.id, entityLabel: product.name });
+
   revalidatePath("/admin/products");
   revalidatePath("/shop");
   return { success: true, productId: product.id };
@@ -115,14 +119,16 @@ export async function createProduct(data: ProductFormData) {
 
 export async function updateProduct(id: string, data: Partial<ProductFormData>) {
   const session = await auth();
-  const user = session?.user as { role?: string } | undefined;
-  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
 
   const product = await prisma.product.update({
     where: { id },
     data: { ...data, updatedAt: new Date() },
     include: { category: true },
   });
+
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "PRODUCT_UPDATE", entity: "product", entityId: product.id, entityLabel: product.name });
 
   await invalidateProductCache(product.slug, product.category.slug);
   revalidatePath("/admin/products");
@@ -134,13 +140,15 @@ export async function updateProduct(id: string, data: Partial<ProductFormData>) 
 
 export async function deleteProduct(id: string) {
   const session = await auth();
-  const user = session?.user as { role?: string } | undefined;
-  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
 
   const product = await prisma.product.update({
     where: { id },
     data: { isActive: false },
   });
+
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "PRODUCT_DELETE", entity: "product", entityId: product.id, entityLabel: product.name });
 
   await invalidateProductCache(product.slug);
   revalidatePath("/admin/products");
@@ -164,7 +172,7 @@ export async function getProductVariants(productId: string) {
 export async function upsertVariants(productId: string, variants: { id?: string; groupName: string; value: string; sku?: string; stock: number; priceAdjust: number; sortOrder: number }[]) {
   const session = await auth();
   const user = session?.user as { role?: string } | undefined;
-  if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) return { error: "Unauthorized" };
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
 
   await prisma.$transaction(async (tx) => {
     const incoming = variants.filter(v => v.id);

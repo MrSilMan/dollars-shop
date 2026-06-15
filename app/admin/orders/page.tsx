@@ -29,12 +29,14 @@ export default async function AdminOrdersPage({
 
   const orders = allOrders.filter((o) => {
     const term = searchStr.toLowerCase();
+    const shippingName = (o.shippingAddress as { name?: string } | null)?.name;
     const matchesSearch =
       !searchStr ||
       o.orderNumber.toLowerCase().includes(term) ||
       o.user?.name?.toLowerCase().includes(term) ||
       o.user?.email.toLowerCase().includes(term) ||
-      o.guestEmail?.toLowerCase().includes(term);
+      o.guestEmail?.toLowerCase().includes(term) ||
+      shippingName?.toLowerCase().includes(term);
     const matchesStatus  = !statusStr  || o.status        === statusStr;
     const matchesPayment = !paymentStr || o.paymentStatus === paymentStr;
     return matchesSearch && matchesStatus && matchesPayment;

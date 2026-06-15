@@ -2,10 +2,40 @@
 
 import { useState, useRef, useTransition } from "react";
 import { toast } from "sonner";
-import { Upload, RotateCcw, Palette, ImageIcon, Info, Type, Save, Eye, Star } from "lucide-react";
+import { Upload, RotateCcw, Palette, ImageIcon, Info, Type, Save, Eye, Star, MessageCircle, Plus, Trash2 } from "lucide-react";
 import type { AppSettingsData } from "@/lib/app-settings";
 
 type Props = { initialSettings: AppSettingsData };
+
+function AddAdminNumberInput({ onAdd }: { onAdd: (num: string) => void }) {
+  const [value, setValue] = useState("");
+  function submit() {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setValue("");
+  }
+  return (
+    <div className="flex gap-2">
+      <input
+        type="tel"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        placeholder="+244938393867"
+        className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors"
+      >
+        <Plus size={14} />
+        Add
+      </button>
+    </div>
+  );
+}
 
 const FONT_SCALES = [
   { value: "SMALL", label: "Small", desc: "14px base" },
@@ -341,6 +371,44 @@ export function AppSettingsPanel({ initialSettings }: Props) {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* WhatsApp Admin Numbers */}
+        <section className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center">
+              <MessageCircle size={16} className="text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">WhatsApp Admin Numbers</h2>
+              <p className="text-xs text-slate-400">Numbers that have access to the admin bot panel</p>
+            </div>
+          </div>
+          <div className="space-y-2 mb-4">
+            {form.whatsappAdminNumbers.map((num, i) => (
+              <div key={i} className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                <MessageCircle size={13} className="text-green-500 shrink-0" />
+                <span className="flex-1 text-sm font-mono text-slate-700">{num}</span>
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, whatsappAdminNumbers: p.whatsappAdminNumbers.filter((_, j) => j !== i) }))}
+                  className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+            {form.whatsappAdminNumbers.length === 0 && (
+              <p className="text-xs text-slate-400 italic">No numbers added — falling back to WHATSAPP_ADMIN_NUMBER env var.</p>
+            )}
+          </div>
+          <AddAdminNumberInput
+            onAdd={(num) => {
+              if (form.whatsappAdminNumbers.includes(num)) return toast.error("Number already added");
+              if (form.whatsappAdminNumbers.length >= 10) return toast.error("Maximum 10 numbers");
+              setForm((p) => ({ ...p, whatsappAdminNumbers: [...p.whatsappAdminNumbers, num] }));
+            }}
+          />
         </section>
 
         {/* Save */}

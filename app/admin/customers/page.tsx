@@ -21,7 +21,7 @@ function avatarColor(seed: string) {
   return AVATAR_COLORS[(seed.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
 }
 
-function initials(name: string | null, email: string) {
+function initials(name: string | null | undefined, email: string) {
   if (name) {
     const parts = name.trim().split(/\s+/);
     return parts.length >= 2
@@ -29,6 +29,16 @@ function initials(name: string | null, email: string) {
       : name.slice(0, 2).toUpperCase();
   }
   return email.slice(0, 2).toUpperCase();
+}
+
+interface CustomerRow {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  orderCount: number;
+  joinedAt: Date;
+  isGuest: boolean;
 }
 
 export default async function AdminCustomersPage({
@@ -43,32 +53,85 @@ export default async function AdminCustomersPage({
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const allCustomers = await prisma.user.findMany({
+  // Registered customers
+  const registeredUsers = await prisma.user.findMany({
     where: { role: "CUSTOMER" },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { orders: true } } },
   });
+
+  const registeredEmails = new Set(registeredUsers.map((u) => u.email.toLowerCase()));
+
+  // Guest orders — exclude emails that already have a registered account
+  const guestOrders = await prisma.order.findMany({
+    where: { userId: null, guestEmail: { not: null } },
+    select: { guestEmail: true, guestPhone: true, shippingAddress: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Group by guestEmail
+  const guestMap = new Map<string, CustomerRow>();
+  for (const o of guestOrders) {
+    const email = o.guestEmail!;
+    const emailKey = email.toLowerCase();
+    if (registeredEmails.has(emailKey)) continue;
+
+    const addr = o.shippingAddress as { name?: string } | null;
+    const existing = guestMap.get(emailKey);
+
+    if (!existing) {
+      guestMap.set(emailKey, {
+        id: `guest:${emailKey}`,
+        name: addr?.name ?? null,
+        email,
+        phone: o.guestPhone,
+        orderCount: 1,
+        joinedAt: o.createdAt,
+        isGuest: true,
+      });
+    } else {
+      existing.orderCount++;
+      // joinedAt = earliest order; name/phone from most recent (already sorted desc, so keep first hit)
+      if (o.createdAt < existing.joinedAt) existing.joinedAt = o.createdAt;
+    }
+  }
+
+  const guestCustomers: CustomerRow[] = Array.from(guestMap.values());
+
+  const allCustomers: CustomerRow[] = [
+    ...registeredUsers.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      orderCount: u._count.orders,
+      joinedAt: u.createdAt,
+      isGuest: false,
+    })),
+    ...guestCustomers,
+  ].sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime());
 
   const customers = allCustomers.filter((c) => {
     const term = searchStr.toLowerCase();
     const matchesSearch =
       !searchStr ||
       c.name?.toLowerCase().includes(term) ||
-      c.email.toLowerCase().includes(term);
+      c.email.toLowerCase().includes(term) ||
+      c.phone?.toLowerCase().includes(term);
     const matchesOrders =
       !ordersStr ||
-      (ordersStr === "yes" ? c._count.orders > 0 : c._count.orders === 0);
+      (ordersStr === "yes" ? c.orderCount > 0 : c.orderCount === 0);
     return matchesSearch && matchesOrders;
   });
 
-  const withOrdersCount = allCustomers.filter((c) => c._count.orders > 0).length;
-  const newThisMonth    = allCustomers.filter((c) => new Date(c.createdAt) >= startOfMonth).length;
+  const withOrdersCount = allCustomers.filter((c) => c.orderCount > 0).length;
+  const newThisMonth    = allCustomers.filter((c) => c.joinedAt >= startOfMonth).length;
 
   const summaryItems = [
-    { label: "Total",         value: allCustomers.length, icon: Users,       cls: "bg-slate-50   text-slate-700"   },
-    { label: "With Orders",   value: withOrdersCount,     icon: ShoppingBag, cls: "bg-blue-50    text-blue-700"    },
-    { label: "New This Month",value: newThisMonth,        icon: UserPlus,    cls: "bg-emerald-50 text-emerald-700" },
-    { label: "No Orders Yet", value: allCustomers.length - withOrdersCount, icon: UserCheck, cls: "bg-amber-50 text-amber-700" },
+    { label: "Total",          value: allCustomers.length,                      icon: Users,       cls: "bg-slate-50   text-slate-700"   },
+    { label: "With Orders",    value: withOrdersCount,                           icon: ShoppingBag, cls: "bg-blue-50    text-blue-700"    },
+    { label: "New This Month", value: newThisMonth,                              icon: UserPlus,    cls: "bg-emerald-50 text-emerald-700" },
+    { label: "No Orders Yet",  value: allCustomers.length - withOrdersCount,     icon: UserCheck,   cls: "bg-amber-50   text-amber-700"   },
   ];
 
   return (
@@ -155,9 +218,16 @@ export default async function AdminCustomersPage({
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${aClr}`}>
                           {ini}
                         </div>
-                        <span className="font-semibold text-(--color-text-primary) leading-tight">
-                          {c.name ?? <span className="text-(--color-text-muted) font-normal italic">No name</span>}
-                        </span>
+                        <div>
+                          <span className="font-semibold text-(--color-text-primary) leading-tight">
+                            {c.name ?? <span className="text-(--color-text-muted) font-normal italic">No name</span>}
+                          </span>
+                          {c.isGuest && (
+                            <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">
+                              WhatsApp
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -175,15 +245,15 @@ export default async function AdminCustomersPage({
 
                     {/* Orders */}
                     <td className="px-5 py-4 text-center">
-                      <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-full min-w-8 text-center ${c._count.orders > 0 ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                        {c._count.orders}
+                      <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-full min-w-8 text-center ${c.orderCount > 0 ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                        {c.orderCount}
                       </span>
                     </td>
 
                     {/* Joined */}
                     <td className="px-5 py-4 text-(--color-text-muted) whitespace-nowrap text-xs">
                       {new Intl.DateTimeFormat("en-ZW", { dateStyle: "medium" }).format(
-                        new Date(c.createdAt)
+                        new Date(c.joinedAt)
                       )}
                     </td>
                   </tr>
@@ -201,7 +271,7 @@ export default async function AdminCustomersPage({
                       <p className="text-sm text-(--color-text-muted)">
                         {searchStr || ordersStr
                           ? "Try adjusting your filters"
-                          : "Customers will appear here once people register"}
+                          : "Customers will appear here once people register or place orders"}
                       </p>
                     </div>
                   </td>

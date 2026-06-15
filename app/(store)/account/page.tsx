@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getMyOrders } from "@/actions/orders";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 import { Package, Heart, User, LogOut, ChevronRight, ShoppingBag, Clock } from "lucide-react";
+import { SignOutButton } from "@/components/store/SignOutButton";
 
 export const metadata: Metadata = { title: "My Account" };
 
@@ -21,11 +22,6 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 export default async function AccountPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/account");
-
-  async function handleSignOut() {
-    "use server";
-    await signOut({ redirectTo: "/" });
-  }
 
   const [orders, wishlistCount, user] = await Promise.all([
     getMyOrders(),
@@ -76,15 +72,10 @@ export default async function AccountPage() {
             </div>
 
             {/* Sign out */}
-            <form action={handleSignOut}>
-              <button
-                type="submit"
-                className="flex items-center gap-1.5 text-white/60 hover:text-white text-xs font-medium transition-colors shrink-0 mt-1"
-              >
-                <LogOut size={14} />
-                Sign Out
-              </button>
-            </form>
+            <SignOutButton className="flex items-center gap-1.5 text-white/60 hover:text-white text-xs font-medium transition-colors shrink-0 mt-1">
+              <LogOut size={14} />
+              Sign Out
+            </SignOutButton>
           </div>
 
           {/* Stats strip */}

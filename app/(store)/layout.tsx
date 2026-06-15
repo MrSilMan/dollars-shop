@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { getCartItems } from "@/actions/cart";
 import { prisma } from "@/lib/prisma";
 import { getAppSettings } from "@/lib/app-settings";
+import { isStaff, adminLandingPage } from "@/lib/permissions";
 
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -17,9 +18,10 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     ? await prisma.wishlistItem.count({ where: { userId: session.user.id } })
     : 0;
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const role = (session?.user as { role?: string } | undefined)?.role ?? "";
   const isSuperAdmin = role === "SUPER_ADMIN";
-  const isAdmin = role === "ADMIN"; // SUPER_ADMIN gets Dev icon only
+  const isAdmin = isStaff(role) && role !== "SUPER_ADMIN";
+  const adminHref = adminLandingPage(role);
 
   return (
     <CartCountProvider
@@ -30,6 +32,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         userName={session?.user?.name}
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
+        adminHref={adminHref}
         logoUrl={settings.logoUrl ?? undefined}
       />
       <main className="flex-1 pb-16 md:pb-0">{children}</main>

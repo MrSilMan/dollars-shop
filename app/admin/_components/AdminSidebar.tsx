@@ -3,30 +3,33 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X, UserCog, ClipboardList } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
+import { canAccess, ROLE_LABELS } from "@/lib/permissions";
 
 const navItems = [
-  { href: "/admin",          label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/products", label: "Products",  icon: Package },
-  { href: "/admin/orders",   label: "Orders",    icon: ShoppingBag },
-  { href: "/admin/customers",label: "Customers", icon: Users },
-  { href: "/admin/coupons",  label: "Coupons",   icon: Tag },
-  { href: "/admin/homepage", label: "Homepage",  icon: Layers },
+  { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, section: "dashboard"  as const },
+  { href: "/admin/products", label: "Products",  icon: Package,         section: "products"   as const },
+  { href: "/admin/orders",   label: "Orders",    icon: ShoppingBag,     section: "orders"     as const },
+  { href: "/admin/customers",label: "Customers", icon: Users,           section: "customers"  as const },
+  { href: "/admin/coupons",  label: "Coupons",   icon: Tag,             section: "coupons"    as const },
+  { href: "/admin/staff",    label: "Team",      icon: UserCog,         section: "staff"      as const },
+  { href: "/admin/homepage", label: "Homepage",  icon: Layers,          section: "homepage"   as const },
+  { href: "/admin/audit",    label: "Audit Log", icon: ClipboardList,   section: "audit"      as const },
 ];
 
-type Props = { logoSrc?: string; isOpen?: boolean; onClose?: () => void };
+type Props = { logoSrc?: string; role?: string; isOpen?: boolean; onClose?: () => void };
 
-export function AdminSidebar({ logoSrc = "/images/logo-1.png", isOpen = false, onClose }: Props) {
+export function AdminSidebar({ logoSrc = "/images/logo-1.png", role = "", isOpen = false, onClose }: Props) {
   const pathname = usePathname();
+  const visible = navItems.filter(item => canAccess(item.section, role));
+  const roleLabel = ROLE_LABELS[role] ?? "Staff";
 
   return (
     <aside
       className={[
         "admin-sidebar flex flex-col overflow-y-auto transition-transform duration-300",
-        // Desktop: always visible, static in flow
         "md:relative md:translate-x-0",
-        // Mobile: fixed drawer, slides in/out
         "max-md:fixed max-md:left-0 max-md:top-0 max-md:h-full max-md:z-40",
         isOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
       ].join(" ")}
@@ -48,7 +51,7 @@ export function AdminSidebar({ logoSrc = "/images/logo-1.png", isOpen = false, o
         </Link>
         <div className="flex items-center gap-2 mt-3">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <p className="text-[10px] text-white/35 font-semibold tracking-widest uppercase">Admin Panel</p>
+          <p className="text-[10px] text-white/35 font-semibold tracking-widest uppercase">{roleLabel}</p>
         </div>
       </div>
 
@@ -56,7 +59,7 @@ export function AdminSidebar({ logoSrc = "/images/logo-1.png", isOpen = false, o
       <nav className="flex-1 px-4 py-5">
         <p className="text-[10px] text-white/25 font-bold uppercase tracking-widest px-3 mb-3">Menu</p>
         <div className="space-y-0.5">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {visible.map(({ href, label, icon: Icon }) => {
             const isActive = href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
             return (
               <Link
@@ -97,14 +100,13 @@ export function AdminSidebar({ logoSrc = "/images/logo-1.png", isOpen = false, o
             Sign Out
           </button>
         </form>
-        <Link
+        <a
           href="/"
-          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:bg-white/8 hover:text-white/80 transition-colors"
         >
           <Store size={15} className="shrink-0" />
           View Store
-        </Link>
+        </a>
       </div>
     </aside>
   );

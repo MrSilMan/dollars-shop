@@ -55,7 +55,6 @@ export async function addToCart(productId: string, quantity: number, variantId?:
       }
     }
 
-    revalidatePath("/cart");
     return { success: true, isNewItem };
   } catch {
     return { success: false, error: "Failed to add to cart" };

@@ -98,15 +98,17 @@ function RegisterContent() {
       </div>
 
       {/* ── Right form panel ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 bg-white overflow-y-auto">
-        {/* Mobile-only logo */}
-        <div className="lg:hidden mb-6">
+      <div className="flex-1 flex flex-col bg-white">
+        {/* Mobile-only branded top bar */}
+        <div className="lg:hidden auth-panel-bg py-10 flex items-center justify-center">
           <Link href="/">
             <Image src="/images/logo-1.png" alt="Dollar Shop" width={140} height={52}
-                   className="h-12 w-auto object-contain" />
+                   className="h-12 w-auto object-contain brightness-0 invert" />
           </Link>
         </div>
 
+        {/* Form content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 overflow-y-auto">
         <div className="w-full max-w-sm">
           <div className="mb-7">
             <h1 className="text-2xl font-bold text-(--color-text-primary) mb-1">Create account</h1>
@@ -221,6 +223,7 @@ function RegisterContent() {
             Already have an account?{" "}
             <Link href="/login" className="text-(--color-primary) font-semibold hover:underline">Sign in</Link>
           </p>
+        </div>
         </div>
       </div>
     </div>

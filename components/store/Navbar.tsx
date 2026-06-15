@@ -10,6 +10,7 @@ interface NavbarProps {
   userName?: string | null;
   isAdmin?: boolean;
   isSuperAdmin?: boolean;
+  adminHref?: string;
   logoUrl?: string;
 }
 
@@ -30,7 +31,7 @@ const categoryLinks = [
   { href: "/shop/plasticware",          label: "Plasticware" },
 ];
 
-export function Navbar({ userName, isAdmin, isSuperAdmin, logoUrl }: NavbarProps) {
+export function Navbar({ userName, isAdmin, isSuperAdmin, adminHref = "/admin", logoUrl }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { cartCount, wishlistCount } = useCartCount();
 
@@ -95,14 +96,14 @@ export function Navbar({ userName, isAdmin, isSuperAdmin, logoUrl }: NavbarProps
               </Link>
             )}
             {isAdmin && (
-              <Link
-                href="/admin"
+              <a
+                href="/api/admin-redirect"
                 className="flex flex-col items-center gap-0.5 px-2 py-1 text-(--color-primary) hover:text-(--color-primary-dark) transition-colors duration-150 rounded"
                 aria-label="Admin Panel"
               >
                 <LayoutDashboard size={20} />
                 <span className="text-[10px] hidden sm:block leading-none font-semibold">Admin</span>
-              </Link>
+              </a>
             )}
             {userName ? (
               <Link

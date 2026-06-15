@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, LogOut, ShieldCheck } from "lucide-react";
 import ProfileForm from "./_components/ProfileForm";
+import { SignOutButton } from "@/components/store/SignOutButton";
 
 export const metadata: Metadata = { title: "Profile Settings | Dollar Shop" };
 
@@ -23,11 +24,6 @@ export default async function ProfilePage() {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  async function handleSignOut() {
-    "use server";
-    await signOut({ redirectTo: "/" });
-  }
 
   return (
     <div className="min-h-screen bg-(--color-bg)">
@@ -97,17 +93,12 @@ export default async function ProfilePage() {
             <p className="text-sm font-semibold text-(--color-text-primary)">Account</p>
           </div>
           <div className="px-6 py-4">
-            <form action={handleSignOut}>
-              <button
-                type="submit"
-                className="flex items-center gap-2.5 text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
-                  <LogOut size={14} className="text-red-500" />
-                </div>
-                Sign out of your account
-              </button>
-            </form>
+            <SignOutButton className="flex items-center gap-2.5 text-sm font-medium text-red-600 hover:text-red-700 transition-colors">
+              <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+                <LogOut size={14} className="text-red-500" />
+              </div>
+              Sign out of your account
+            </SignOutButton>
           </div>
         </div>
 

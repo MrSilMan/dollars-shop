@@ -6,13 +6,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { AdminSidebar } from "./AdminSidebar";
 
-export function AdminShell({ logoSrc, children }: { logoSrc: string; children: React.ReactNode }) {
+export function AdminShell({ logoSrc, role, children }: { logoSrc: string; role: string; children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="h-screen overflow-hidden flex admin-root">
       <AdminSidebar
         logoSrc={logoSrc}
+        role={role}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
