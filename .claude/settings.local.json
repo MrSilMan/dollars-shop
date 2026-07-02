@@ -418,7 +418,9 @@
       "Bash(pkill -f \"next dev\")",
       "Bash(git status *)",
       "Bash(git restore *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\USER\\Documents\\DOCS\\SoftWise\\Softwise-Proj\\Dollar-Shop-App\\dollar-shop\\lib",

@@ -41,3 +41,16 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# db backups
+/db_backups
+
+# uploads backups
+/public/uploads.bak-*
+
+# logs
+/logs
+*.log
+
+# scratch/test files
+test-receipt-preview*.pdf
