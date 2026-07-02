@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import { getOrderById } from "@/actions/orders";
 import { clearCart } from "@/actions/cart";
 import { getFeaturedProducts } from "@/actions/products";
+import { getBlurMapForProducts } from "@/lib/images";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 import { CheckCircle2, MessageCircle, Package, Truck, ClipboardList, MapPin } from "lucide-react";
 import { ConfettiEffect } from "./_components/ConfettiEffect";
-import { PrintButton } from "./_components/PrintButton";
+import { DownloadReceiptButton } from "./_components/DownloadReceiptButton";
 
 export const metadata: Metadata = { title: "Order Confirmed" };
 
@@ -50,6 +51,7 @@ export default async function SuccessPage({ searchParams }: Props) {
   const address = order?.shippingAddress as ShippingAddress | undefined;
   const purchasedIds = new Set(order?.items.map((i) => i.productId) ?? []);
   const recommendations = featuredProducts.filter((p) => !purchasedIds.has(p.id)).slice(0, 4);
+  const blurMap = await getBlurMapForProducts(recommendations);
 
   return (
     <>
@@ -166,7 +168,7 @@ export default async function SuccessPage({ searchParams }: Props) {
             Track Order on WhatsApp
           </a>
 
-          <PrintButton />
+          {order && <DownloadReceiptButton orderId={order.id} />}
 
           <Link
             href="/shop"
@@ -195,6 +197,7 @@ export default async function SuccessPage({ searchParams }: Props) {
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                         sizes="(max-width: 640px) 50vw, 25vw"
+                        blurDataURL={blurMap[product.images[0]]}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs text-(--color-text-muted)">

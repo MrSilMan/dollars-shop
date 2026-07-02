@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import Link from "next/link";
 import { Heart, ShoppingCart, Check } from "lucide-react";
 import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
@@ -24,9 +24,10 @@ interface ProductCardProps {
   product: Product;
   wishlistIds?: string[];
   onWishlistToggle?: (productId: string, productName?: string) => void;
+  blurDataURL?: string;
 }
 
-export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: ProductCardProps) {
+export function ProductCard({ product, wishlistIds = [], onWishlistToggle, blurDataURL }: ProductCardProps) {
   const { add, isPending } = useCart();
   const [justAdded, setJustAdded] = useState(false);
   const [wishPending, startWish] = useTransition();
@@ -56,6 +57,7 @@ export function ProductCard({ product, wishlistIds = [], onWishlistToggle }: Pro
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            blurDataURL={blurDataURL}
           />
         </Link>
 

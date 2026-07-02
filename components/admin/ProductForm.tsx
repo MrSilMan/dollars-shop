@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
-import { createProduct, updateProduct, generateSku } from "@/actions/products";
+import { createProduct, updateProduct, generateSku, createCategory } from "@/actions/products";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, ImagePlus, AlertCircle, Loader2, Link2, Plus, Trash2, Star } from "lucide-react";
@@ -71,9 +71,17 @@ function FieldError({ message }: { message?: string }) {
 
 const emptyVariant = (): VariantRow => ({ groupName: "Size", value: "", sku: "", stock: 0, priceAdjust: 0, sortOrder: 0 });
 
-export function ProductForm({ categories, defaultValues, productId, initialVariants = [] }: ProductFormProps) {
+const NEW_CATEGORY_VALUE = "__new__";
+
+export function ProductForm({ categories: initialCategories, defaultValues, productId, initialVariants = [] }: ProductFormProps) {
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState<string | null>(null);
+  const [categories, setCategories]       = useState<Category[]>(initialCategories);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryError, setCategoryError]   = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const newCategoryInputRef                 = useRef<HTMLInputElement>(null);
   const tagInputRef                        = useRef<HTMLInputElement>(null);
   const [variants, setVariants]           = useState<VariantRow[]>(initialVariants);
   const [images, setImages]               = useState<string[]>(defaultValues?.images ?? []);
@@ -110,7 +118,7 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
   }, [categoryId, skuEdited, setValue]);
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
+    const arr = Array.from(files);
     if (!arr.length) return;
     setUploading(c => c + arr.length);
     try {
@@ -167,6 +175,46 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
   const nameReg = register("name");
   const slugReg = register("slug");
   const skuReg  = register("sku");
+  const categoryReg = register("categoryId");
+
+  const handleCategorySelect = (value: string) => {
+    if (value === NEW_CATEGORY_VALUE) {
+      setAddingCategory(true);
+      setCategoryError(null);
+      setNewCategoryName("");
+      setTimeout(() => newCategoryInputRef.current?.focus(), 0);
+      return;
+    }
+    setValue("categoryId", value);
+  };
+
+  const saveNewCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) { setCategoryError("Enter a category name"); return; }
+    setSavingCategory(true);
+    setCategoryError(null);
+    try {
+      const result = await createCategory(name);
+      if ("error" in result) {
+        setCategoryError(result.error ?? "Failed to create category");
+        return;
+      }
+      setCategories(prev => [...prev, result.category]);
+      setValue("categoryId", result.category.id);
+      setAddingCategory(false);
+      setNewCategoryName("");
+    } catch {
+      setCategoryError("Failed to create category");
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const cancelNewCategory = () => {
+    setAddingCategory(false);
+    setNewCategoryName("");
+    setCategoryError(null);
+  };
 
   const addVariant = () => setVariants(prev => [...prev, { ...emptyVariant(), sortOrder: prev.length }]);
   const removeVariant = (idx: number) => setVariants(prev => prev.filter((_, i) => i !== idx));
@@ -188,7 +236,7 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
       }
 
       const savedProductId = productId ?? ("productId" in result ? (result.productId as string) : undefined);
-      if (savedProductId && variants.length > 0) {
+      if (savedProductId) {
         await upsertVariants(savedProductId, variants.map((v, i) => ({ ...v, sortOrder: i })));
       }
 
@@ -358,11 +406,54 @@ export function ProductForm({ categories, defaultValues, productId, initialVaria
                 </div>
                 <div>
                   <label className={label}>Category</label>
-                  <select {...register("categoryId")} className={`${input} cursor-pointer`}>
-                    <option value="">Select category…</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <FieldError message={errors.categoryId?.message} />
+                  {addingCategory ? (
+                    <div className="flex gap-2">
+                      <input
+                        ref={newCategoryInputRef}
+                        type="text"
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { e.preventDefault(); saveNewCategory(); }
+                          if (e.key === "Escape") { e.preventDefault(); cancelNewCategory(); }
+                        }}
+                        placeholder="New category name"
+                        disabled={savingCategory}
+                        autoFocus
+                        className={input}
+                      />
+                      <button
+                        type="button"
+                        onClick={saveNewCategory}
+                        disabled={savingCategory}
+                        aria-label="Save category"
+                        className="flex shrink-0 items-center justify-center rounded-xl bg-(--color-primary) px-3.5 text-white transition-colors hover:bg-(--color-primary-dark) disabled:opacity-60"
+                      >
+                        {savingCategory ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelNewCategory}
+                        disabled={savingCategory}
+                        aria-label="Cancel new category"
+                        className="flex shrink-0 items-center justify-center rounded-xl border border-(--color-border) px-3.5 transition-colors hover:bg-(--color-surface-alt)"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      {...categoryReg}
+                      onChange={e => { categoryReg.onChange(e); handleCategorySelect(e.target.value); }}
+                      className={`${input} cursor-pointer`}
+                    >
+                      <option value="">Select category…</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <option value={NEW_CATEGORY_VALUE}>+ Add new category…</option>
+                    </select>
+                  )}
+                  {categoryError && <FieldError message={categoryError} />}
+                  {!categoryError && <FieldError message={errors.categoryId?.message} />}
                 </div>
               </div>
             </div>

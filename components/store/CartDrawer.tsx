@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import Link from "next/link";
 import { X, ShoppingCart, Minus, Plus, Trash2 } from "lucide-react";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
@@ -167,7 +167,7 @@ export function CartDrawer({ items, open, onClose }: CartDrawerProps) {
                 onClick={onClose}
                 className="block text-center bg-(--color-primary) hover:bg-(--color-primary-dark) active:bg-(--color-primary-dark) text-white font-black py-3 rounded-full transition-colors duration-150"
               >
-                Proceed to Checkout
+                Buy Now
               </Link>
               <Link
                 href="/cart"

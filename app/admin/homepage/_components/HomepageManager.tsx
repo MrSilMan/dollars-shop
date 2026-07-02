@@ -80,6 +80,8 @@ type Slide = {
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;
+  bgNone: boolean;
+  ctaNone: boolean;
   sortOrder: number;
   isActive: boolean;
 };

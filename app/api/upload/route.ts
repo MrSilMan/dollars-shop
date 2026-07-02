@@ -1,8 +1,12 @@
 import { auth } from "@/lib/auth";
 import { canAccess } from "@/lib/permissions";
+import { setImageBlur } from "@/lib/redis";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
+import sharp from "sharp";
 import type { NextRequest } from "next/server";
+
+const MAX_DIMENSION = 1920;
 
 function detectMimeType(buf: Buffer): string | null {
   if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return "image/jpeg";
@@ -35,18 +39,36 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid file type. Use JPEG, PNG, WebP or GIF." }, { status: 400 });
   }
 
-  const mimeToExt: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-  };
-  const ext = mimeToExt[detectedType];
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const uploadDir = join(process.cwd(), "public", "uploads");
+  // Animated GIFs can't be safely re-encoded as WebP without losing animation; keep them as-is.
+  const isAnimatedGif = detectedType === "image/gif";
+
+  const filename = isAnimatedGif
+    ? `${Date.now()}-${Math.random().toString(36).slice(2)}.gif`
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+  const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), "public", "uploads");
 
   await mkdir(uploadDir, { recursive: true });
-  await writeFile(join(uploadDir, filename), buffer);
 
-  return Response.json({ url: `/uploads/${filename}` });
+  const outputBuffer = isAnimatedGif
+    ? buffer
+    : await sharp(buffer)
+        .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+
+  await writeFile(join(uploadDir, filename), outputBuffer);
+
+  const url = `/uploads/${filename}`;
+
+  let blurDataURL: string | undefined;
+  if (!isAnimatedGif) {
+    const blurBuffer = await sharp(outputBuffer)
+      .resize(16, 16, { fit: "inside" })
+      .webp({ quality: 50 })
+      .toBuffer();
+    blurDataURL = `data:image/webp;base64,${blurBuffer.toString("base64")}`;
+    await setImageBlur(url, blurDataURL);
+  }
+
+  return Response.json({ url, blurDataURL });
 }

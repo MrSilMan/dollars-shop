@@ -9,6 +9,7 @@ import { initiateInnBucksPayment } from "@/lib/payments/innbucks";
 import { logger } from "@/lib/logger";
 import { getCartItems, clearCart } from "./cart";
 import { sendOrderConfirmationEmail, type OrderEmailData } from "@/lib/email";
+import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
 
 export type PaymentInitResult =
   | { success: true; method: "ECOCASH"; transactionId: string; amount: number }
@@ -119,29 +120,61 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
 
     // Only send confirmation email for COD — EcoCash/InnBucks orders are not yet paid
     if (parsed.data.method === "CASH_ON_DELIVERY") {
-      const emailData: OrderEmailData = {
-        orderNumber,
-        customerName: parsed.data.name,
-        customerEmail: parsed.data.email,
-        items: cartItems.map(item => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: Number(item.product.price),
-          variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
-        })),
-        subtotal,
-        deliveryFee,
-        discount,
-        total,
-        paymentMethod: parsed.data.method,
-        shippingAddress: {
-          line1: parsed.data.line1,
-          line2: parsed.data.line2,
-          city: parsed.data.city,
-          province: parsed.data.province,
-        },
-      };
-      sendOrderConfirmationEmail(emailData).catch(() => {});
+      const items = cartItems.map(item => ({
+        name: item.product.name,
+        sku: item.product.sku,
+        quantity: item.quantity,
+        price: Number(item.product.price),
+        subtotal: Number(item.product.price) * item.quantity,
+        variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
+      }));
+
+      resolveReceiptBranding()
+        .then((branding) => {
+          const receiptData: ReceiptData = {
+            orderNumber,
+            createdAt: order.createdAt,
+            paymentMethod: parsed.data.method,
+            customerName: parsed.data.name,
+            customerPhone: parsed.data.phone,
+            items,
+            subtotal,
+            deliveryFee,
+            discount,
+            total,
+            shippingAddress: {
+              line1: parsed.data.line1,
+              line2: parsed.data.line2,
+              city: parsed.data.city,
+              province: parsed.data.province,
+              country: "Zimbabwe",
+            },
+            ...branding,
+          };
+          return generateReceiptPdf(receiptData);
+        })
+        .then((receiptPdf) => {
+          const emailData: OrderEmailData = {
+            orderNumber,
+            customerName: parsed.data.name,
+            customerEmail: parsed.data.email,
+            items,
+            subtotal,
+            deliveryFee,
+            discount,
+            total,
+            paymentMethod: parsed.data.method,
+            shippingAddress: {
+              line1: parsed.data.line1,
+              line2: parsed.data.line2,
+              city: parsed.data.city,
+              province: parsed.data.province,
+            },
+            receiptPdf,
+          };
+          return sendOrderConfirmationEmail(emailData);
+        })
+        .catch(() => {});
     }
 
     return { orderId: order.id, orderNumber };

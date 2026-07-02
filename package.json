@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public/. .next/standalone/public/",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
@@ -14,7 +14,8 @@
     "db:generate-seed": "tsx prisma/generate-seed.ts",
     "db:restore-products": "tsx prisma/restore-lost-products.ts",
     "db:studio": "prisma studio",
-    "cache:clear": "node --env-file=.env scripts/clear-cache.mjs"
+    "cache:clear": "node --env-file=.env scripts/clear-cache.mjs",
+    "images:recompress": "node --env-file=.env scripts/recompress-uploads.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -24,6 +25,7 @@
     "@hookform/resolvers": "^5.4.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^10.54.0",
     "@types/nodemailer": "^8.0.0",
     "bcryptjs": "^3.0.3",
@@ -41,6 +43,7 @@
     "react-hook-form": "^7.76.1",
     "recharts": "^3.8.1",
     "resend": "^6.12.4",
+    "sharp": "0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "winston": "^3.19.0",

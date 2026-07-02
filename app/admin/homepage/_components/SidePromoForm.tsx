@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Loader2, Upload, X } from "lucide-react";
 import { createSidePromo, updateSidePromo } from "@/actions/homepage";
+import { LinkPicker } from "./LinkPicker";
 
 type Promo = {
   id: string;
@@ -151,7 +152,7 @@ export function SidePromoForm({ promo, onDone }: Props) {
 
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Link</label>
-        <input value={form.href} onChange={(e) => set("href", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="/shop/daily-necessities" />
+        <LinkPicker value={form.href} onChange={(v) => set("href", v)} placeholder="/shop/daily-necessities" />
       </div>
 
       <div className="flex items-center justify-between">

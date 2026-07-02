@@ -260,6 +260,8 @@ model HeroSlide {
   imageUrl  String?
   bgFrom    String   @default("#FF4400")
   bgTo      String   @default("#E63900")
+  bgNone    Boolean  @default(false)
+  ctaNone   Boolean  @default(false)
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())

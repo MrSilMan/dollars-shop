@@ -41,6 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
       icons: {
         icon: [{ url: `${settings.faviconUrl}?v=${settings.updatedAt.getTime()}`, sizes: "any" }],
         shortcut: `${settings.faviconUrl}?v=${settings.updatedAt.getTime()}`,
+        apple: [{ url: `${settings.faviconUrl}?v=${settings.updatedAt.getTime()}`, sizes: "any" }],
       },
     }),
   };

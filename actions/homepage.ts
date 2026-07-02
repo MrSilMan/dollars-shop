@@ -14,19 +14,24 @@ async function requireAdmin() {
 // ─── Hero Slides ────────────────────────────────────────────────────────────
 
 const HeroSlideSchema = z.object({
-  tag: z.string().min(1),
+  tag: z.string().default(""),
   tagBg: z.string().min(1),
-  headline: z.string().min(1),
-  sub: z.string().min(1),
-  ctaLabel: z.string().min(1),
-  ctaHref: z.string().min(1),
+  headline: z.string().default(""),
+  sub: z.string().default(""),
+  ctaLabel: z.string().default(""),
+  ctaHref: z.string().default(""),
   ctaBg: z.string().min(1).default("#FFFFFF"),
   imageUrl: z.string().optional().nullable(),
   bgFrom: z.string().min(1),
   bgTo: z.string().min(1),
+  bgNone: z.boolean().default(false),
+  ctaNone: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
-});
+}).refine(
+  (d) => d.imageUrl || (d.tag.length > 0 && d.headline.length > 0 && d.sub.length > 0 && d.ctaLabel.length > 0 && d.ctaHref.length > 0),
+  { message: "Tag, headline, subtitle, and CTA are required when no background image is set." }
+);
 
 export async function getHeroSlides() {
   return prisma.heroSlide.findMany({ orderBy: { sortOrder: "asc" } });

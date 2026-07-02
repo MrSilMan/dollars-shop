@@ -5,7 +5,7 @@ import { getMyOrders } from "@/actions/orders";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
-import { Package, Heart, User, LogOut, ChevronRight, ShoppingBag, Clock } from "lucide-react";
+import { Package, Heart, User, LogOut, ChevronRight, ShoppingBag, Clock, Lock } from "lucide-react";
 import { SignOutButton } from "@/components/store/SignOutButton";
 
 export const metadata: Metadata = { title: "My Account" };
@@ -94,7 +94,7 @@ export default async function AccountPage() {
         </div>
 
         {/* ── Nav tiles ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
               icon: Package,
@@ -116,6 +116,13 @@ export default async function AccountPage() {
               sub: "Edit your details",
               href: "/account/profile",
               accent: "bg-sky-50 text-sky-600",
+            },
+            {
+              icon: Lock,
+              label: "Security",
+              sub: "Change your password",
+              href: "/account/security",
+              accent: "bg-amber-50 text-amber-600",
             },
           ].map(({ icon: Icon, label, sub, href, accent }) => (
             <Link

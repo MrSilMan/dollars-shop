@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createPromoCard, updatePromoCard } from "@/actions/homepage";
+import { LinkPicker } from "./LinkPicker";
 
 type Card = {
   id: string;
@@ -109,7 +110,7 @@ export function PromoCardForm({ card, onDone }: Props) {
 
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Link</label>
-        <input value={form.href} onChange={(e) => set("href", e.target.value)} required className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg" placeholder="/shop" />
+        <LinkPicker value={form.href} onChange={(v) => set("href", v)} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

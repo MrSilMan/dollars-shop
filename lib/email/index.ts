@@ -3,6 +3,7 @@ import { orderConfirmedHtml } from "./templates/orderConfirmed";
 import { paymentReceivedHtml } from "./templates/paymentReceived";
 import { statusUpdateHtml } from "./templates/statusUpdate";
 import { staffInviteHtml } from "./templates/staffInvite";
+import { promotionalDealHtml } from "./templates/promotionalDeal";
 import { getAppSettings } from "@/lib/app-settings";
 
 function getTransporter() {
@@ -23,10 +24,12 @@ function isConfigured() {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
-async function send(to: string, subject: string, html: string) {
+async function send(to: string, subject: string, html: string, attachments?: { filename: string; content: Buffer; contentType: string }[]) {
   if (!isConfigured()) return;
-  await getTransporter().sendMail({ from: FROM, to, subject, html });
+  await getTransporter().sendMail({ from: FROM, to, subject, html, attachments });
 }
+
+export { isConfigured };
 
 export interface OrderEmailData {
   orderNumber: string;
@@ -39,14 +42,20 @@ export interface OrderEmailData {
   total: number;
   paymentMethod: string;
   shippingAddress: { line1: string; line2?: string | null; city: string; province: string };
+  receiptPdf?: Buffer;
+}
+
+function receiptAttachment(data: OrderEmailData) {
+  if (!data.receiptPdf) return undefined;
+  return [{ filename: `receipt-${data.orderNumber}.pdf`, content: data.receiptPdf, contentType: "application/pdf" }];
 }
 
 export async function sendOrderConfirmationEmail(data: OrderEmailData) {
-  await send(data.customerEmail, `Order Confirmed — ${data.orderNumber} | Dollar Shop`, orderConfirmedHtml(data));
+  await send(data.customerEmail, `Order Confirmed — ${data.orderNumber} | Dollar Shop`, orderConfirmedHtml(data), receiptAttachment(data));
 }
 
 export async function sendPaymentReceivedEmail(data: OrderEmailData) {
-  await send(data.customerEmail, `Payment Received — ${data.orderNumber} | Dollar Shop`, paymentReceivedHtml(data));
+  await send(data.customerEmail, `Payment Received — ${data.orderNumber} | Dollar Shop`, paymentReceivedHtml(data), receiptAttachment(data));
 }
 
 export async function sendOrderStatusUpdateEmail(data: {
@@ -83,4 +92,8 @@ export async function sendStaffInvitationEmail(data: {
       logoUrl,
     }),
   );
+}
+
+export async function sendPromotionalDealEmail(data: { to: string; subject: string; bodyHtml: string; ctaText?: string | null; ctaUrl?: string | null }) {
+  await send(data.to, data.subject, promotionalDealHtml(data));
 }

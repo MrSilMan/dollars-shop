@@ -17,6 +17,7 @@ const ACCESS: Record<string, string[]> = {
   orders:     ["SALES", "MANAGER", "ADMIN", "SUPER_ADMIN"],
   customers:  ["SALES", "MANAGER", "ADMIN", "SUPER_ADMIN"],
   coupons:    ["MANAGER", "ADMIN", "SUPER_ADMIN"],
+  newsletter: ["MANAGER", "ADMIN", "SUPER_ADMIN"],
   homepage:   ["MANAGER", "ADMIN", "SUPER_ADMIN"],
   staff:      ["MANAGER", "ADMIN", "SUPER_ADMIN"],
   audit:      ["ADMIN", "SUPER_ADMIN"],

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   };
   const ext = mimeToExt[detectedType];
   const filename = `favicon-${Date.now()}.${ext}`;
-  const uploadDir = join(process.cwd(), "public", "uploads");
+  const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), "public", "uploads");
 
   await mkdir(uploadDir, { recursive: true });
   await writeFile(join(uploadDir, filename), buffer);

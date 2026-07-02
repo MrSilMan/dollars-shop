@@ -4,6 +4,8 @@ import { initiatePayment, type PaymentInitResult } from "@/actions/checkout";
 import { logger } from "@/lib/logger";
 import { getBotCartItems, clearBotCart, botCartTotal } from "./cart";
 import type { CheckoutDraft } from "./session";
+import { sendOrderConfirmationEmail, type OrderEmailData } from "@/lib/email";
+import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
 
 export type CompleteCheckoutDraft = Required<
   Pick<CheckoutDraft, "name" | "email" | "phone" | "line1" | "city" | "province" | "method">
@@ -92,6 +94,61 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
 
     await clearBotCart(waPhone);
     logger.info("WhatsApp bot order created", { orderId: order.id, orderNumber, total });
+
+    // Only send confirmation email for COD — EcoCash/InnBucks orders are not yet paid
+    // (those get a "payment received" email from the payment webhook once confirmed)
+    if (draft.method === "CASH_ON_DELIVERY") {
+      const items = cartItems.map((item) => ({
+        name: item.product.name,
+        sku: item.product.sku,
+        quantity: item.quantity,
+        price: Number(item.product.price),
+        subtotal: Number(item.product.price) * item.quantity,
+        variantSnapshot: item.variant ? `${item.variant.groupName}: ${item.variant.value}` : null,
+      }));
+
+      resolveReceiptBranding()
+        .then((branding) => {
+          const receiptData: ReceiptData = {
+            orderNumber,
+            createdAt: order.createdAt,
+            paymentMethod: draft.method,
+            customerName: draft.name,
+            customerPhone: draft.phone,
+            items,
+            subtotal,
+            deliveryFee,
+            discount: 0,
+            total,
+            shippingAddress: {
+              line1: draft.line1,
+              line2: draft.line2,
+              city: draft.city,
+              province: draft.province,
+              country: "Zimbabwe",
+            },
+            ...branding,
+          };
+          return generateReceiptPdf(receiptData);
+        })
+        .then((receiptPdf) => {
+          const emailData: OrderEmailData = {
+            orderNumber,
+            customerName: draft.name,
+            customerEmail: draft.email,
+            items,
+            subtotal,
+            deliveryFee,
+            discount: 0,
+            total,
+            paymentMethod: draft.method,
+            shippingAddress: { line1: draft.line1, line2: draft.line2, city: draft.city, province: draft.province },
+            receiptPdf,
+          };
+          return sendOrderConfirmationEmail(emailData);
+        })
+        .catch(() => {});
+    }
 
     return { success: true, orderNumber, payment };
   } catch (error) {

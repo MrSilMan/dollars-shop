@@ -137,7 +137,8 @@ export function StaffManager({
         {staff.length === 0 ? (
           <div className="py-12 text-center text-(--color-text-muted) text-sm">No team members yet</div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-(--color-surface-alt) border-b border-(--color-border)">
                 {["Member", "Role", "Status", "Joined", ""].map(h => (
@@ -174,7 +175,7 @@ export function StaffManager({
                       {m.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-xs text-(--color-text-muted)">
+                  <td className="px-5 py-4 text-xs text-(--color-text-muted) whitespace-nowrap">
                     {new Date(m.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-4">
@@ -203,6 +204,7 @@ export function StaffManager({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -213,7 +215,8 @@ export function StaffManager({
             <h2 className="font-semibold text-base">Pending Invitations</h2>
             <p className="text-xs text-(--color-text-muted) mt-0.5">{pending.length} awaiting acceptance</p>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-(--color-surface-alt) border-b border-(--color-border)">
                 {["Email", "Role", "Invited by", "Expires", ""].map(h => (
@@ -236,9 +239,9 @@ export function StaffManager({
                       {ROLE_LABELS[inv.role] ?? inv.role}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-xs text-(--color-text-muted)">{inv.inviter.name ?? "—"}</td>
+                  <td className="px-5 py-4 text-xs text-(--color-text-muted) whitespace-nowrap">{inv.inviter.name ?? "—"}</td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-1.5 text-xs text-amber-600">
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 whitespace-nowrap">
                       <Clock size={12} />
                       {new Date(inv.expiresAt).toLocaleDateString()}
                     </div>
@@ -256,6 +259,7 @@ export function StaffManager({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

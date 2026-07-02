@@ -14,7 +14,7 @@ import {
   ShieldCheck, Truck, BadgeCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import { DeliveryProgressBar } from "@/app/(store)/cart/_components/DeliveryProgressBar";
 
 const FREE_THRESHOLD = 15;
@@ -39,6 +39,7 @@ interface CheckoutFormProps {
   defaultEmail?: string;
   defaultPhone?: string;
   defaultName?: string;
+  blurMap?: Record<string, string>;
 }
 
 interface AppliedCoupon {
@@ -58,6 +59,7 @@ export function CheckoutForm({
   defaultEmail,
   defaultPhone,
   defaultName,
+  blurMap = {},
 }: Omit<CheckoutFormProps, "total"> & { subtotal: number }) {
   const [step, setStep] = useState(0);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -504,6 +506,7 @@ export function CheckoutForm({
                   alt={item.product.name}
                   fill
                   className="object-cover"
+                  blurDataURL={blurMap[item.product.images[0]]}
                 />
               </div>
               <span className="line-clamp-2 flex-1 text-(--color-text-muted) text-xs leading-tight">

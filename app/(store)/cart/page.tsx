@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { getCartItems } from "@/actions/cart";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 import Link from "next/link";
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import { CartControls } from "./_components/CartControls";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ShieldCheck, RotateCcw, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/ProductCard";
 import { DeliveryProgressBar } from "./_components/DeliveryProgressBar";
+import { getBlurMapForProducts } from "@/lib/images";
 
 export const metadata: Metadata = { title: "Shopping Cart" };
 
@@ -41,6 +42,8 @@ export default async function CartPage() {
     compareAtPrice: p.compareAtPrice?.toNumber() ?? null,
     weight: p.weight?.toNumber() ?? null,
   }));
+
+  const blurMap = await getBlurMapForProducts([...items.map((i) => i.product), ...recommended]);
 
   if (items.length === 0) {
     return (
@@ -81,6 +84,7 @@ export default async function CartPage() {
                     width={80}
                     height={80}
                     className="w-20 h-20 object-cover rounded-xl bg-(--color-surface-alt)"
+                    blurDataURL={blurMap[item.product.images[0]]}
                   />
                 </Link>
                 <div className="flex-1 min-w-0">
@@ -123,7 +127,7 @@ export default async function CartPage() {
               href={session ? "/checkout" : "/login?callbackUrl=/checkout"}
               className="block text-center bg-(--color-primary) hover:bg-(--color-primary-dark) text-white font-bold py-3 rounded-xl transition-colors"
             >
-              {session ? "Proceed to Checkout" : "Sign In to Checkout"}
+              {session ? "Buy Now" : "Sign In to Buy Now"}
             </Link>
 
             {/* Trust signals */}
@@ -155,7 +159,7 @@ export default async function CartPage() {
           <h2 className="font-display text-xl font-bold mb-4">You may also like</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {recommended.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} blurDataURL={blurMap[product.images[0]]} />
             ))}
           </div>
         </section>

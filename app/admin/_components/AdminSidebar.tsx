@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X, UserCog, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X, UserCog, ClipboardList, Mail, UserCircle } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
 import { canAccess, ROLE_LABELS } from "@/lib/permissions";
 
@@ -13,6 +13,7 @@ const navItems = [
   { href: "/admin/orders",   label: "Orders",    icon: ShoppingBag,     section: "orders"     as const },
   { href: "/admin/customers",label: "Customers", icon: Users,           section: "customers"  as const },
   { href: "/admin/coupons",  label: "Coupons",   icon: Tag,             section: "coupons"    as const },
+  { href: "/admin/newsletter",label: "Newsletter",icon: Mail,           section: "newsletter" as const },
   { href: "/admin/staff",    label: "Team",      icon: UserCog,         section: "staff"      as const },
   { href: "/admin/homepage", label: "Homepage",  icon: Layers,          section: "homepage"   as const },
   { href: "/admin/audit",    label: "Audit Log", icon: ClipboardList,   section: "audit"      as const },
@@ -91,6 +92,14 @@ export function AdminSidebar({ logoSrc = "/images/logo-1.png", role = "", isOpen
 
       {/* Footer */}
       <div className="px-4 py-4 border-t border-white/8 space-y-0.5">
+        <Link
+          href="/admin/account"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:bg-white/8 hover:text-white/80 transition-colors"
+        >
+          <UserCircle size={15} className="shrink-0" />
+          My Account
+        </Link>
         <form action={signOutAction}>
           <button
             type="submit"

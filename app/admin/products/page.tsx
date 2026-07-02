@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 import { formatUSD } from "@/lib/utils/currency";
 import { Plus, Pencil, Package, CheckCircle, Star, AlertTriangle } from "lucide-react";
 import { ProductFilters } from "./_components/ProductFilters";

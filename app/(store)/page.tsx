@@ -11,6 +11,7 @@ import {
   getAllProductsPaginated,
 } from "@/actions/products";
 import { getActiveHeroSlides, getActiveSidePromos, getActivePromoCards } from "@/actions/homepage";
+import { getBlurMapForProducts } from "@/lib/images";
 import Link from "next/link";
 import { ShieldCheck, Truck, MessageCircle, ShoppingBasket, LayoutGrid, Package, Users, Star, Zap } from "lucide-react";
 import { NewsletterSection } from "@/components/store/NewsletterSection";
@@ -54,6 +55,7 @@ export default async function HomePage({
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const promoCards: PromoCardData[] = rawPromoCards.length > 0 ? rawPromoCards : DEFAULT_PROMO_CARDS;
+  const blurMap = await getBlurMapForProducts([...featured, ...flashDeals, ...newArrivals, ...allProducts] as Parameters<typeof ProductGrid>[0]["products"]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
@@ -162,7 +164,7 @@ export default async function HomePage({
             </Link>
           </div>
           <div className="p-3">
-            <ProductGrid products={flashDeals as Parameters<typeof ProductGrid>[0]["products"]} />
+            <ProductGrid products={flashDeals as Parameters<typeof ProductGrid>[0]["products"]} blurMap={blurMap} />
           </div>
         </section>
       )}
@@ -180,7 +182,7 @@ export default async function HomePage({
             </Link>
           </div>
           <div className="p-3">
-            <ProductGrid products={newArrivals as Parameters<typeof ProductGrid>[0]["products"]} />
+            <ProductGrid products={newArrivals as Parameters<typeof ProductGrid>[0]["products"]} blurMap={blurMap} />
           </div>
         </section>
       )}
@@ -201,7 +203,7 @@ export default async function HomePage({
             </Link>
           </div>
           <div className="p-3">
-            <ProductGrid products={featured as Parameters<typeof ProductGrid>[0]["products"]} />
+            <ProductGrid products={featured as Parameters<typeof ProductGrid>[0]["products"]} blurMap={blurMap} />
           </div>
         </section>
       )}
@@ -224,7 +226,7 @@ export default async function HomePage({
           </Link>
         </div>
         <div className="p-3">
-          <ProductGrid products={allProducts as Parameters<typeof ProductGrid>[0]["products"]} />
+          <ProductGrid products={allProducts as Parameters<typeof ProductGrid>[0]["products"]} blurMap={blurMap} />
         </div>
         <HomePagination
           page={page}

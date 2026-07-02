@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Image from "next/image";
+import { ProductImage as Image } from "@/components/shared/ProductImage";
 
 interface Props {
   images: string[];
   name: string;
   discount: number;
+  blurMap?: Record<string, string>;
 }
 
-export function ProductImageGallery({ images, name, discount }: Props) {
+export function ProductImageGallery({ images, name, discount, blurMap = {} }: Props) {
   const [active, setActive] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomLayerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,7 @@ export function ProductImageGallery({ images, name, discount }: Props) {
             className="object-cover"
             priority
             sizes="(max-width: 1024px) 100vw, 50vw"
+            blurDataURL={blurMap[src]}
           />
         </div>
         {discount > 0 && (
@@ -67,7 +69,7 @@ export function ProductImageGallery({ images, name, discount }: Props) {
               }`}
               aria-label={`View image ${i + 1}`}
             >
-              <Image src={img} alt={`${name} ${i + 1}`} fill className="object-cover" />
+              <Image src={img} alt={`${name} ${i + 1}`} fill className="object-cover" blurDataURL={blurMap[img]} />
             </button>
           ))}
         </div>

@@ -4,6 +4,7 @@ import { CategoryNav } from "@/components/store/CategoryNav";
 import { ShopPagination } from "@/components/store/ShopPagination";
 import { TrustBadges } from "@/components/store/TrustBadges";
 import { getAllCategories, getAllProductsPaginated } from "@/actions/products";
+import { getBlurMapForProducts } from "@/lib/images";
 
 export const metadata: Metadata = {
   title: "All Products",
@@ -26,6 +27,7 @@ export default async function ShopPage({ searchParams }: Props) {
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const blurMap = await getBlurMapForProducts(products);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -34,7 +36,7 @@ export default async function ShopPage({ searchParams }: Props) {
         <p className="text-sm text-(--color-text-muted)">{total} products</p>
       </div>
       <CategoryNav categories={categories} />
-      <ProductGrid products={products as Parameters<typeof ProductGrid>[0]["products"]} />
+      <ProductGrid products={products as Parameters<typeof ProductGrid>[0]["products"]} blurMap={blurMap} />
       <ShopPagination
         page={page}
         totalPages={totalPages}

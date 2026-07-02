@@ -6,6 +6,7 @@ import { CategoryNav } from "@/components/store/CategoryNav";
 import { ShopPagination } from "@/components/store/ShopPagination";
 import { TrustBadges } from "@/components/store/TrustBadges";
 import { getProductsByCategory, getAllCategories } from "@/actions/products";
+import { getBlurMapForProducts } from "@/lib/images";
 import { categoryIconMap } from "@/lib/categories";
 
 interface Props {
@@ -39,6 +40,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const CategoryIcon = categoryIconMap[result.category.slug] ?? ShoppingBasket;
   const totalPages = Math.ceil(result.total / PAGE_SIZE);
+  const blurMap = await getBlurMapForProducts(result.products);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -58,6 +60,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       <ProductGrid
         products={result.products as Parameters<typeof ProductGrid>[0]["products"]}
         emptyMessage={`No products in ${result.category.name} yet.`}
+        blurMap={blurMap}
       />
       <ShopPagination
         page={page}

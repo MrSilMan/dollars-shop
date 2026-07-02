@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, LogOut, Store, ChevronRight, Shield } from "lucide-react";
+import { Settings, LogOut, Store, ChevronRight, Shield, UserCircle } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
 
 const navItems = [
   { href: "/super-admin/settings", label: "App Settings", icon: Settings },
+  { href: "/super-admin/account", label: "My Account", icon: UserCircle },
   { href: "/", label: "View Store", icon: Store },
 ];
 

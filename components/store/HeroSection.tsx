@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, ShoppingBasket, LayoutGrid } from "lucide-react";
 import { categoryIconMap as slugIconMap } from "@/lib/categories";
 
@@ -24,6 +24,8 @@ interface HeroSlide {
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;
+  bgNone?: boolean;
+  ctaNone?: boolean;
 }
 
 interface SidePromoItem {
@@ -138,6 +140,15 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
   const next = () => setCurrent((c) => (c + 1) % slides.length);
   const slide = slides[current];
 
+  const touchStartX = useRef<number | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    touchStartX.current = null;
+  };
+
   const sidebarCats = categories.length > 0 ? categories : fallbackCategories;
 
   return (
@@ -182,35 +193,49 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
 
       {/* ── Middle: Main carousel ── */}
       <div
-        className="relative text-white rounded-xl overflow-hidden transition-colors duration-500 h-85 sm:h-95 lg:h-105 flex items-center [background:linear-gradient(135deg,var(--slide-from),var(--slide-to))]"
-        style={{ "--slide-from": slide.bgFrom, "--slide-to": slide.bgTo } as React.CSSProperties}
+        className="relative text-white rounded-xl overflow-hidden transition-colors duration-500 h-85 sm:h-95 lg:h-105 flex items-center"
+        style={slide.bgNone
+          ? { background: "transparent" }
+          : { background: `linear-gradient(135deg, ${slide.bgFrom}, ${slide.bgTo})` }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
         {slide.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none select-none" />
+          <img src={slide.imageUrl} alt="" className={`absolute inset-0 w-full h-full pointer-events-none select-none ${slide.bgNone ? "opacity-100 object-contain" : "opacity-40 object-cover"}`} />
         )}
-        <div className="relative px-8 max-w-sm w-full z-10">
-          <span
-            className="inline-block text-white text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide bg-(--tag-bg)"
-            style={{ "--tag-bg": slide.tagBg } as React.CSSProperties}
-          >
-            {slide.tag}
-          </span>
-          <h1 className="text-2xl sm:text-4xl font-black leading-tight mb-3 whitespace-pre-line">
-            {slide.headline}
-          </h1>
-          <p className="text-white/80 text-sm sm:text-base mb-7">{slide.sub}</p>
-          <Link
-            href={slide.ctaHref}
-            className="inline-flex items-center gap-2 bg-(--cta-bg) text-(--cta-fg) hover:opacity-90 font-black px-6 py-2.5 rounded-full transition-opacity duration-150 text-sm"
-            style={{ "--cta-bg": slide.ctaBg ?? "#FFFFFF", "--cta-fg": slide.bgFrom } as React.CSSProperties}
-          >
-            {slide.ctaLabel} →
-          </Link>
-        </div>
+        {(slide.tag || slide.headline || slide.sub || (!slide.ctaNone && slide.ctaLabel)) && (
+          <div className="relative px-8 max-w-sm w-full z-10">
+            {slide.tag && (
+              <span
+                className="inline-block text-white text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide bg-(--tag-bg)"
+                style={{ "--tag-bg": slide.tagBg } as React.CSSProperties}
+              >
+                {slide.tag}
+              </span>
+            )}
+            {slide.headline && (
+              <h1 className="text-2xl sm:text-4xl font-black leading-tight mb-3 whitespace-pre-line">
+                {slide.headline}
+              </h1>
+            )}
+            {slide.sub && (
+              <p className="text-white/80 text-sm sm:text-base mb-7">{slide.sub}</p>
+            )}
+            {!slide.ctaNone && slide.ctaLabel && slide.ctaHref && (
+              <Link
+                href={slide.ctaHref}
+                className="inline-flex items-center gap-2 bg-(--cta-bg) text-(--cta-fg) hover:opacity-90 font-black px-6 py-2.5 rounded-full transition-opacity duration-150 text-sm"
+                style={{ "--cta-bg": slide.ctaBg ?? "#FFFFFF", "--cta-fg": slide.bgFrom } as React.CSSProperties}
+              >
+                {slide.ctaLabel} →
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Slide dots */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
           {slides.map((_, i) => (
             <button
               key={i}
@@ -228,17 +253,17 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
           type="button"
           onClick={prev}
           aria-label="Previous slide"
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/35 flex items-center justify-center transition-colors duration-150"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/30 hover:bg-black/50 active:bg-black/60 flex items-center justify-center transition-colors duration-150 touch-manipulation"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={20} />
         </button>
         <button
           type="button"
           onClick={next}
           aria-label="Next slide"
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/35 flex items-center justify-center transition-colors duration-150"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/30 hover:bg-black/50 active:bg-black/60 flex items-center justify-center transition-colors duration-150 touch-manipulation"
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={20} />
         </button>
       </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getProductBySlug, getProductsByCategory } from "@/actions/products";
+import { getBlurMapForProducts } from "@/lib/images";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
 import { getStockStatus, stockLabel } from "@/lib/utils/stock";
@@ -46,6 +47,7 @@ export default async function ProductPage({ params }: Props) {
 
   const related = await getProductsByCategory(product.category.slug);
   const CategoryIcon = categoryIconMap[product.category.slug] ?? ShoppingBasket;
+  const blurMap = await getBlurMapForProducts([product, ...related.products]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -64,7 +66,7 @@ export default async function ProductPage({ params }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Images */}
-        <ProductImageGallery images={product.images} name={product.name} discount={discount} />
+        <ProductImageGallery images={product.images} name={product.name} discount={discount} blurMap={blurMap} />
 
         {/* Info */}
         <div className="space-y-5">
@@ -156,7 +158,7 @@ export default async function ProductPage({ params }: Props) {
       {related.products.length > 0 && (
         <section>
           <h2 className="font-display text-xl font-bold mb-4">You Might Also Like</h2>
-          <ProductGrid products={(related.products as Parameters<typeof ProductGrid>[0]["products"]).filter((p) => p.id !== product.id).slice(0, 4)} />
+          <ProductGrid products={(related.products as Parameters<typeof ProductGrid>[0]["products"]).filter((p) => p.id !== product.id).slice(0, 4)} blurMap={blurMap} />
         </section>
       )}
     </div>

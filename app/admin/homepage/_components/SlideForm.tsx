@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Loader2, ImageIcon, X, Trash2 } from "lucide-react";
 import { createHeroSlide, updateHeroSlide } from "@/actions/homepage";
+import { LinkPicker } from "./LinkPicker";
 
 type Slide = {
   id: string;
@@ -16,6 +17,8 @@ type Slide = {
   imageUrl: string | null;
   bgFrom: string;
   bgTo: string;
+  bgNone: boolean;
+  ctaNone: boolean;
   sortOrder: number;
   isActive: boolean;
 };
@@ -36,6 +39,8 @@ const DEFAULT: Omit<Slide, "id" | "createdAt" | "updatedAt"> = {
   imageUrl: null,
   bgFrom: "#FF4400",
   bgTo: "#E63900",
+  bgNone: false,
+  ctaNone: false,
   sortOrder: 0,
   isActive: true,
 };
@@ -141,11 +146,11 @@ export function SlideForm({ slide, onDone }: Props) {
       {/* Live Preview */}
       <div
         className="rounded-2xl overflow-hidden h-32 relative flex items-center px-6 shadow-inner"
-        style={{ background: `linear-gradient(135deg, ${form.bgFrom}, ${form.bgTo})` }}
+        style={{ background: form.bgNone ? "#111" : `linear-gradient(135deg, ${form.bgFrom}, ${form.bgTo})` }}
       >
         {form.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={form.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none select-none" />
+          <img src={form.imageUrl} alt="" className={`absolute inset-0 w-full h-full pointer-events-none select-none ${form.bgNone ? "opacity-100 object-contain" : "opacity-40 object-cover"}`} />
         )}
         <div className="relative z-10 flex-1 min-w-0">
           {form.tag ? (
@@ -162,7 +167,7 @@ export function SlideForm({ slide, onDone }: Props) {
             {form.headline || <span className="opacity-30 font-normal">Headline text…</span>}
           </p>
           {form.sub && <p className="text-white/70 text-[10px] mb-2.5 line-clamp-1">{form.sub}</p>}
-          {form.ctaLabel && (
+          {form.ctaLabel && !form.ctaNone && (
             <span
               className="inline-flex items-center text-[10px] font-black px-3 py-1 rounded-full"
               style={{ background: form.ctaBg, color: form.bgFrom }}
@@ -222,31 +227,50 @@ export function SlideForm({ slide, onDone }: Props) {
           </div>
         </div>
 
-        {/* Gradient — collapsed if image is set */}
-        {hasImage ? (
-          <details className="group">
-            <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none list-none flex items-center gap-1.5">
-              <span className="inline-block transition-transform group-open:rotate-90">›</span>
-              Fallback gradient
-            </summary>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <Field label="From">
+        {/* No-gradient toggle (only shown when image is set) */}
+        {hasImage && (
+          <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={form.bgNone}
+                onChange={(e) => set("bgNone", e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`w-9 h-5 rounded-full transition-colors ${form.bgNone ? "bg-orange-500" : "bg-gray-200"}`} />
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.bgNone ? "translate-x-4" : "translate-x-0"}`} />
+            </div>
+            <span className="text-xs font-semibold text-gray-700">No fallback gradient</span>
+          </label>
+        )}
+
+        {/* Gradient colours — hidden when no-gradient is on */}
+        {!form.bgNone && (
+          hasImage ? (
+            <details className="group">
+              <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none list-none flex items-center gap-1.5">
+                <span className="inline-block transition-transform group-open:rotate-90">›</span>
+                Fallback gradient
+              </summary>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Field label="From">
+                  <ColorInput label="Gradient from" value={form.bgFrom} onChange={(v) => set("bgFrom", v)} />
+                </Field>
+                <Field label="To">
+                  <ColorInput label="Gradient to" value={form.bgTo} onChange={(v) => set("bgTo", v)} />
+                </Field>
+              </div>
+            </details>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Gradient From">
                 <ColorInput label="Gradient from" value={form.bgFrom} onChange={(v) => set("bgFrom", v)} />
               </Field>
-              <Field label="To">
+              <Field label="Gradient To">
                 <ColorInput label="Gradient to" value={form.bgTo} onChange={(v) => set("bgTo", v)} />
               </Field>
             </div>
-          </details>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Gradient From">
-              <ColorInput label="Gradient from" value={form.bgFrom} onChange={(v) => set("bgFrom", v)} />
-            </Field>
-            <Field label="Gradient To">
-              <ColorInput label="Gradient to" value={form.bgTo} onChange={(v) => set("bgTo", v)} />
-            </Field>
-          </div>
+          )
         )}
       </div>
 
@@ -296,40 +320,55 @@ export function SlideForm({ slide, onDone }: Props) {
 
       {/* Call to Action */}
       <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
-        <SectionLabel>Button{hasImage && <span className="ml-1 normal-case font-normal text-gray-400 tracking-normal"> · optional</span>}</SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Label">
-            <input
-              value={form.ctaLabel}
-              onChange={(e) => set("ctaLabel", e.target.value)}
-              required={!hasImage}
-              className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
-              placeholder="Shop Deals"
-            />
-          </Field>
-          <Field label="Link">
-            <input
-              value={form.ctaHref}
-              onChange={(e) => set("ctaHref", e.target.value)}
-              required={!hasImage}
-              className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
-              placeholder="/shop"
-            />
-          </Field>
+        <div className="flex items-center justify-between">
+          <SectionLabel>Button{hasImage && <span className="ml-1 normal-case font-normal text-gray-400 tracking-normal"> · optional</span>}</SectionLabel>
+          {hasImage && (
+            <label className="flex items-center gap-2 cursor-pointer select-none -mt-3">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={form.ctaNone}
+                  onChange={(e) => set("ctaNone", e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-9 h-5 rounded-full transition-colors ${form.ctaNone ? "bg-orange-500" : "bg-gray-200"}`} />
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.ctaNone ? "translate-x-4" : "translate-x-0"}`} />
+              </div>
+              <span className="text-xs font-semibold text-gray-700">No button</span>
+            </label>
+          )}
         </div>
-        <Field label="Button Colour">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <ColorInput label="Button colour" value={form.ctaBg} onChange={(v) => set("ctaBg", v)} />
+        {!form.ctaNone && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Label">
+                <input
+                  value={form.ctaLabel}
+                  onChange={(e) => set("ctaLabel", e.target.value)}
+                  required={!hasImage}
+                  className="w-full text-sm px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none hover:border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-colors"
+                  placeholder="Shop Deals"
+                />
+              </Field>
+              <Field label="Link">
+                <LinkPicker value={form.ctaHref} onChange={(v) => set("ctaHref", v)} required={!hasImage} />
+              </Field>
             </div>
-            <div
-              className="h-9 px-4 rounded-full flex items-center text-xs font-black shrink-0 pointer-events-none"
-              style={{ background: form.ctaBg, color: form.bgFrom }}
-            >
-              {form.ctaLabel || "Button"} →
-            </div>
-          </div>
-        </Field>
+            <Field label="Button Colour">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <ColorInput label="Button colour" value={form.ctaBg} onChange={(v) => set("ctaBg", v)} />
+                </div>
+                <div
+                  className="h-9 px-4 rounded-full flex items-center text-xs font-black shrink-0 pointer-events-none"
+                  style={{ background: form.ctaBg, color: form.bgFrom }}
+                >
+                  {form.ctaLabel || "Button"} →
+                </div>
+              </div>
+            </Field>
+          </>
+        )}
       </div>
 
       {/* Footer */}

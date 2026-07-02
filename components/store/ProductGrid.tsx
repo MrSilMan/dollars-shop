@@ -21,9 +21,10 @@ interface ProductGridProps {
   products: Product[];
   wishlistIds?: string[];
   emptyMessage?: string;
+  blurMap?: Record<string, string>;
 }
 
-export function ProductGrid({ products, wishlistIds: initialIds = [], emptyMessage = "No products found." }: ProductGridProps) {
+export function ProductGrid({ products, wishlistIds: initialIds = [], emptyMessage = "No products found.", blurMap = {} }: ProductGridProps) {
   const [wishlistIds, setWishlistIds] = useState<string[]>(initialIds);
   const { toggle } = useWishlist();
 
@@ -59,7 +60,7 @@ export function ProductGrid({ products, wishlistIds: initialIds = [], emptyMessa
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} wishlistIds={wishlistIds} onWishlistToggle={handleToggle} />
+        <ProductCard key={product.id} product={product} wishlistIds={wishlistIds} onWishlistToggle={handleToggle} blurDataURL={blurMap[product.images[0]]} />
       ))}
     </div>
   );

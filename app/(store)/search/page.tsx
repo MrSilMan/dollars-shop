@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { searchProducts } from "@/actions/products";
+import { getBlurMapForProducts } from "@/lib/images";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { SearchBar } from "@/components/store/SearchBar";
 import { Suspense } from "react";
@@ -14,12 +15,13 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 
 async function SearchResults({ query }: { query: string }) {
   const products = await searchProducts(query);
+  const blurMap = await getBlurMapForProducts(products);
   return (
     <>
       <p className="text-sm text-(--color-text-muted) mb-4">
         {products.length} result{products.length !== 1 ? "s" : ""} for &ldquo;<strong>{query}</strong>&rdquo;
       </p>
-      <ProductGrid products={products as unknown as Parameters<typeof ProductGrid>[0]["products"]} emptyMessage={`No products found for "${query}"`} />
+      <ProductGrid products={products as unknown as Parameters<typeof ProductGrid>[0]["products"]} emptyMessage={`No products found for "${query}"`} blurMap={blurMap} />
     </>
   );
 }

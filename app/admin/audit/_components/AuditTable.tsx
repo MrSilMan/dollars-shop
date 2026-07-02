@@ -106,17 +106,17 @@ export function AuditTable({
             </button>
           ))}
         </div>
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative">
+        <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-(--color-text-muted)" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search actor or entity…"
-              className="pl-8 pr-3 py-2 text-sm border border-(--color-border) rounded-xl outline-none focus:border-(--color-primary) focus:ring-2 focus:ring-(--color-primary)/10 bg-white w-56"
+              className="pl-8 pr-3 py-2 text-sm border border-(--color-border) rounded-xl outline-none focus:border-(--color-primary) focus:ring-2 focus:ring-(--color-primary)/10 bg-white w-full sm:w-56"
             />
           </div>
-          <button type="submit" className="px-3 py-2 text-sm bg-(--color-primary) text-white rounded-xl font-semibold">
+          <button type="submit" className="px-3 py-2 text-sm bg-(--color-primary) text-white rounded-xl font-semibold shrink-0">
             Search
           </button>
         </form>
@@ -127,7 +127,8 @@ export function AuditTable({
         {entries.length === 0 ? (
           <div className="py-16 text-center text-(--color-text-muted) text-sm">No audit entries found</div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="bg-(--color-surface-alt) border-b border-(--color-border)">
                 {["Time", "Actor", "Action", "Target", "Details"].map(h => (
@@ -151,11 +152,11 @@ export function AuditTable({
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.color}`}>
+                      <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.color}`}>
                         {meta.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-xs text-(--color-text-primary)">
+                    <td className="px-5 py-3 text-xs text-(--color-text-primary) whitespace-nowrap">
                       {e.entityLabel ?? e.entity ?? "—"}
                     </td>
                     <td className="px-5 py-3">
@@ -166,6 +167,7 @@ export function AuditTable({
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

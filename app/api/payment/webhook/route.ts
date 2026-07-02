@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { verifyInnBucksWebhook } from "@/lib/payments/innbucks";
 import { verifyEcoCashWebhook } from "@/lib/payments/ecocash";
 import { sendPaymentReceivedEmail, type OrderEmailData } from "@/lib/email";
+import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
 
 const VALID_PROVIDERS = ["innbucks", "ecocash"] as const;
 
@@ -66,22 +67,59 @@ export async function POST(req: NextRequest) {
       logger.info("Payment webhook processed", { orderId: order.id, provider, reference });
 
       // Fire payment-confirmed email (non-blocking)
-      const addr = order.shippingAddress as { name?: string; email?: string; line1?: string; line2?: string; city?: string; province?: string };
+      const addr = order.shippingAddress as { name?: string; email?: string; phone?: string; line1?: string; line2?: string; city?: string; province?: string; country?: string };
       const customerEmail = addr.email ?? order.guestEmail;
       if (customerEmail) {
-        const emailData: OrderEmailData = {
-          orderNumber: order.orderNumber,
-          customerName: addr.name ?? "Customer",
-          customerEmail,
-          items: items.map(i => ({ name: i.productName, quantity: i.quantity, price: Number(i.price), variantSnapshot: i.variantSnapshot })),
-          subtotal: Number(order.subtotal),
-          deliveryFee: Number(order.deliveryFee),
-          discount: Number(order.discount),
-          total: Number(order.total),
-          paymentMethod: order.paymentMethod,
-          shippingAddress: { line1: addr.line1 ?? "", line2: addr.line2, city: addr.city ?? "", province: addr.province ?? "" },
-        };
-        sendPaymentReceivedEmail(emailData).catch(() => {});
+        const receiptItems = items.map(i => ({
+          name: i.productName,
+          sku: i.productSku,
+          quantity: i.quantity,
+          price: Number(i.price),
+          subtotal: Number(i.price) * i.quantity,
+          variantSnapshot: i.variantSnapshot,
+        }));
+
+        resolveReceiptBranding()
+          .then((branding) => {
+            const receiptData: ReceiptData = {
+              orderNumber: order.orderNumber,
+              createdAt: order.createdAt,
+              paymentMethod: order.paymentMethod,
+              customerName: addr.name ?? "Customer",
+              customerPhone: addr.phone,
+              items: receiptItems,
+              subtotal: Number(order.subtotal),
+              deliveryFee: Number(order.deliveryFee),
+              discount: Number(order.discount),
+              total: Number(order.total),
+              shippingAddress: {
+                line1: addr.line1 ?? "",
+                line2: addr.line2,
+                city: addr.city ?? "",
+                province: addr.province ?? "",
+                country: addr.country ?? "Zimbabwe",
+              },
+              ...branding,
+            };
+            return generateReceiptPdf(receiptData);
+          })
+          .then((receiptPdf) => {
+            const emailData: OrderEmailData = {
+              orderNumber: order.orderNumber,
+              customerName: addr.name ?? "Customer",
+              customerEmail,
+              items: receiptItems,
+              subtotal: Number(order.subtotal),
+              deliveryFee: Number(order.deliveryFee),
+              discount: Number(order.discount),
+              total: Number(order.total),
+              paymentMethod: order.paymentMethod,
+              shippingAddress: { line1: addr.line1 ?? "", line2: addr.line2, city: addr.city ?? "", province: addr.province ?? "" },
+              receiptPdf,
+            };
+            return sendPaymentReceivedEmail(emailData);
+          })
+          .catch(() => {});
       }
     }
 

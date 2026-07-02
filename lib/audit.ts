@@ -5,6 +5,7 @@ export type AuditAction =
   | "PRODUCT_CREATE"
   | "PRODUCT_UPDATE"
   | "PRODUCT_DELETE"
+  | "CATEGORY_CREATE"
   | "ORDER_STATUS_UPDATE"
   | "ORDER_COD_PAYMENT"
   | "COUPON_CREATE"
@@ -12,7 +13,8 @@ export type AuditAction =
   | "COUPON_DELETE"
   | "STAFF_INVITE"
   | "STAFF_EDIT"
-  | "STAFF_REMOVE";
+  | "STAFF_REMOVE"
+  | "NEWSLETTER_SEND";
 
 export interface AuditParams {
   actorId?: string;

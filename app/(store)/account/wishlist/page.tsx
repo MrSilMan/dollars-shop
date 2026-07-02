@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/store/ProductGrid";
+import { getBlurMapForProducts } from "@/lib/images";
 import Link from "next/link";
 import { ArrowLeft, Heart, ShoppingBag, Tag, TrendingDown } from "lucide-react";
 import { formatUSD } from "@/lib/utils/currency";
@@ -36,6 +37,7 @@ export default async function WishlistPage() {
   const saleCount = products.filter(
     (p) => p.compareAtPrice && p.compareAtPrice > p.price
   ).length;
+  const blurMap = await getBlurMapForProducts(products);
 
   return (
     <div className="min-h-screen bg-(--color-bg)">
@@ -115,6 +117,7 @@ export default async function WishlistPage() {
           products={products as Parameters<typeof ProductGrid>[0]["products"]}
           wishlistIds={products.map((p) => p.id)}
           emptyMessage="Your wishlist is empty. Browse our shop and save items you love!"
+          blurMap={blurMap}
         />
 
       </div>

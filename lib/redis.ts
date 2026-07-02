@@ -64,3 +64,33 @@ export async function checkRateLimit(key: string, limit: number, windowSeconds: 
     return true;
   }
 }
+
+function blurKey(imageUrl: string) {
+  return `image:blur:${imageUrl}`;
+}
+
+/** Persist a tiny base64 blur placeholder for an image URL. No TTL — uploaded files are immutable. */
+export async function setImageBlur(imageUrl: string, blurDataURL: string) {
+  try {
+    await redis.set(blurKey(imageUrl), blurDataURL);
+  } catch {
+    // silently fail — blur placeholder is a progressive enhancement
+  }
+}
+
+/** Look up cached blur placeholders for a batch of image URLs. Missing entries are simply omitted. */
+export async function getImageBlurMap(imageUrls: string[]): Promise<Record<string, string>> {
+  const urls = [...new Set(imageUrls)].filter(Boolean);
+  if (urls.length === 0) return {};
+  try {
+    const values = await redis.mget(urls.map(blurKey));
+    const map: Record<string, string> = {};
+    urls.forEach((url, i) => {
+      const v = values[i];
+      if (v) map[url] = v;
+    });
+    return map;
+  } catch {
+    return {};
+  }
+}

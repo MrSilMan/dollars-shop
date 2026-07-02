@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 import { toNumber } from "@/lib/utils/currency";
+import { getBlurMapForProducts } from "@/lib/images";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -22,6 +23,7 @@ export default async function CheckoutPage() {
 
   const subtotal = cartItems.reduce((s, i) => s + toNumber(i.product.price) * i.quantity, 0);
   const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
+  const blurMap = await getBlurMapForProducts(cartItems.map((i) => i.product));
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -37,6 +39,7 @@ export default async function CheckoutPage() {
         defaultEmail={session?.user?.email ?? undefined}
         defaultName={session?.user?.name ?? undefined}
         defaultPhone={userPhone}
+        blurMap={blurMap}
       />
     </div>
   );

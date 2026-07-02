@@ -1,7 +1,5 @@
-import { MessageCircle } from "lucide-react";
-
 export function WhatsAppButton() {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "263772566468";
+  const number = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "263772566468").replace(/\D/g, "");
   return (
     <a
       href={`https://wa.me/${number}`}
@@ -10,7 +8,9 @@ export function WhatsAppButton() {
       aria-label="Chat with us on WhatsApp"
       className="fixed bottom-20 right-4 md:bottom-6 sm:right-6 z-50 flex items-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-semibold pl-3 pr-4 py-3 rounded-full shadow-lg transition-all duration-150 hover:scale-105 active:scale-95"
     >
-      <MessageCircle size={20} fill="white" />
+      <svg viewBox="0 0 32 32" width="20" height="20" fill="white" aria-hidden="true">
+        <path d="M16.004 0C7.166 0 0 7.166 0 16.004c0 2.82.738 5.598 2.135 8.04L.05 31.5a.5.5 0 0 0 .61.61l7.48-2.06a15.93 15.93 0 0 0 7.864 2.054h.001C24.834 32.104 32 24.938 32 16.1 32 7.262 24.842 0 16.004 0Zm0 29.146h-.001a13.15 13.15 0 0 1-6.71-1.84l-.482-.286-4.998 1.376 1.4-4.872-.314-.5a13.13 13.13 0 0 1-2.02-7.02C2.879 8.74 8.74 2.879 16.004 2.879c3.51 0 6.81 1.368 9.292 3.85a13.04 13.04 0 0 1 3.846 9.27c0 7.265-5.91 13.147-13.138 13.147Zm7.21-9.84c-.395-.198-2.336-1.152-2.698-1.283-.362-.132-.625-.198-.888.198-.263.395-1.02 1.283-1.25 1.546-.23.263-.46.296-.855.099-.395-.198-1.667-.614-3.176-1.96-1.174-1.047-1.966-2.34-2.196-2.735-.23-.395-.025-.61.172-.808.165-.165.198-.296.297-.494.099-.198.05-.395-.05-.593-.099-.198-.886-2.137-1.215-2.926-.32-.77-.646-.667-.888-.68-.23-.012-.494-.014-.757-.014-.263 0-.69.099-1.052.494-.362.395-1.382 1.35-1.382 3.29 0 1.94 1.415 3.812 1.612 4.075.198.263 2.728 4.164 6.605 5.671 3.878 1.507 3.878 1.006 4.572.94.695-.066 2.236-.913 2.55-1.794.313-.88.313-1.633.218-1.794-.094-.16-.36-.258-.755-.456Z"/>
+      </svg>
       <span className="text-sm hidden sm:inline">WhatsApp Us</span>
     </a>
   );

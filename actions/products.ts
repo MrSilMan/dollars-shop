@@ -162,6 +162,32 @@ export async function getAllCategories() {
   });
 }
 
+export async function createCategory(name: string) {
+  const session = await auth();
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Category name is required" };
+
+  const slug = trimmed.toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+  if (!slug) return { error: "Category name is required" };
+
+  const existing = await prisma.category.findUnique({ where: { slug } });
+  if (existing) return existing.isActive ? { error: "Category already exists" } : { error: "A deleted category with this name already exists" };
+
+  const category = await prisma.category.create({ data: { name: trimmed, slug } });
+
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "CATEGORY_CREATE", entity: "category", entityId: category.id, entityLabel: category.name });
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/new");
+  return { success: true, category };
+}
+
 export async function getProductVariants(productId: string) {
   return prisma.productVariant.findMany({
     where: { productId },
@@ -258,6 +284,23 @@ export async function getNewArrivals(limit = 8) {
     })
   );
   return products.map(serializeProduct);
+}
+
+export async function getNewArrivalsPaginated(page = 1, limit = 12) {
+  const result = await withCache(`products:new-arrivals-paginated:${page}:${limit}`, 1800, async () => {
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: { isActive: true },
+        include: { category: true },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.product.count({ where: { isActive: true } }),
+    ]);
+    return { products, total };
+  });
+  return { ...result, products: result.products.map(serializeProduct) };
 }
 
 export async function getAllProductsPaginated(page = 1, limit = 12) {
