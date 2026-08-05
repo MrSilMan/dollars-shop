@@ -6,11 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 import { toNumber } from "@/lib/utils/currency";
 import { getBlurMapForProducts } from "@/lib/images";
+import { getAppSettings } from "@/lib/app-settings";
+import { calculateDeliveryFee } from "@/lib/delivery";
+import { isInnBucksEnabled } from "@/lib/payments/providers";
 
 export const metadata: Metadata = { title: "Checkout" };
-
-const FREE_THRESHOLD = 15;
-const DELIVERY_FEE = 3;
 
 export default async function CheckoutPage() {
   const [session, cartItems] = await Promise.all([auth(), getCartItems()]);
@@ -22,8 +22,11 @@ export default async function CheckoutPage() {
     : undefined;
 
   const subtotal = cartItems.reduce((s, i) => s + toNumber(i.product.price) * i.quantity, 0);
-  const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
-  const blurMap = await getBlurMapForProducts(cartItems.map((i) => i.product));
+  const deliveryFee = calculateDeliveryFee(subtotal);
+  const [blurMap, settings] = await Promise.all([
+    getBlurMapForProducts(cartItems.map((i) => i.product)),
+    getAppSettings(),
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -40,6 +43,8 @@ export default async function CheckoutPage() {
         defaultName={session?.user?.name ?? undefined}
         defaultPhone={userPhone}
         blurMap={blurMap}
+        zwgRate={settings.zwgRate}
+        innBucksEnabled={isInnBucksEnabled()}
       />
     </div>
   );

@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Edit Product — Admin" };
 export default async function EditProductPage({ params }: Props) {
   const { id } = await params;
   const [product, categories, variants] = await Promise.all([
-    prisma.product.findUnique({ where: { id } }),
+    prisma.product.findUnique({ where: { id }, include: { additionalCategories: { select: { id: true } } } }),
     getAllCategories(),
     prisma.productVariant.findMany({ where: { productId: id }, orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }] }),
   ]);
@@ -47,6 +47,7 @@ export default async function EditProductPage({ params }: Props) {
             stock: product.stock,
             lowStockAlert: product.lowStockAlert,
             categoryId: product.categoryId,
+            additionalCategoryIds: product.additionalCategories.map((c) => c.id),
             featured: product.featured,
             isActive: product.isActive,
             tags: product.tags,

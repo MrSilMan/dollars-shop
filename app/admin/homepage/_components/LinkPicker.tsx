@@ -10,6 +10,7 @@ const STATIC_LINKS: Option[] = [
   { label: "Home", value: "/", group: "Pages" },
   { label: "Shop (all products)", value: "/shop", group: "Pages" },
   { label: "New Arrivals", value: "/shop/new-arrivals", group: "Pages" },
+  { label: "Flash Deals", value: "/shop/flash-deals", group: "Pages" },
 ];
 
 let categoryCache: Option[] | null = null;

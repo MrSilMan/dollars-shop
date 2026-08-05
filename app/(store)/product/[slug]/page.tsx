@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getProductBySlug, getProductsByCategory } from "@/actions/products";
+import { getProductBySlug, getProductsByCategory, getCategoryImage } from "@/actions/products";
 import { getBlurMapForProducts } from "@/lib/images";
+import { FREE_DELIVERY_THRESHOLD_USD, DELIVERY_FEE_USD, DELIVERY_AREA_LABEL } from "@/lib/delivery";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { formatUSD, calcDiscount, toNumber } from "@/lib/utils/currency";
 import { getStockStatus, stockLabel } from "@/lib/utils/stock";
 import { AddToCartButton } from "./_components/AddToCartButton";
 import { ProductImageGallery } from "./_components/ProductImageGallery";
-import { ChevronRight, Star, ShoppingBasket } from "lucide-react";
-import { categoryIconMap } from "@/lib/categories";
+import { ChevronRight, Star } from "lucide-react";
+import { CategoryImage } from "@/components/store/CategoryImage";
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -26,7 +28,7 @@ export default async function ProductPage({ params }: Props) {
     id: string; name: string; slug: string; description: string; sku: string;
     price: { toNumber: () => number }; compareAtPrice?: { toNumber: () => number } | null;
     stock: number; lowStockAlert: number; images: string[]; featured: boolean;
-    category: { id: string; name: string; slug: string; icon?: string | null };
+    category: { id: string; name: string; slug: string; icon?: string | null; imageUrl?: string | null };
     reviews: { id: string; rating: number; comment?: string | null; user: { name?: string | null } }[];
   } | null;
 
@@ -45,8 +47,8 @@ export default async function ProductPage({ params }: Props) {
     ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
     : null;
 
+  const categoryImage = await getCategoryImage(product.category.id, product.category.imageUrl);
   const related = await getProductsByCategory(product.category.slug);
-  const CategoryIcon = categoryIconMap[product.category.slug] ?? ShoppingBasket;
   const blurMap = await getBlurMapForProducts([product, ...related.products]);
 
   return (
@@ -72,7 +74,14 @@ export default async function ProductPage({ params }: Props) {
         <div className="space-y-5">
           <div>
             <span className="inline-flex items-center gap-1 text-xs font-medium bg-(--color-surface-alt) px-2.5 py-1 rounded-full text-(--color-text-muted) mb-2">
-              <CategoryIcon size={12} aria-hidden="true" />
+              <CategoryImage
+                slug={product.category.slug}
+                name={product.category.name}
+                image={categoryImage}
+                size={16}
+                iconSize={12}
+                className="w-4 h-4 rounded-full"
+              />
               {product.category.name}
             </span>
             <h1 className="font-display text-2xl sm:text-3xl font-bold leading-snug">{product.name}</h1>
@@ -118,9 +127,9 @@ export default async function ProductPage({ params }: Props) {
           <details className="border border-(--color-border) rounded-xl overflow-hidden">
             <summary className="px-4 py-3 font-medium cursor-pointer select-none hover:bg-(--color-surface-alt) transition-colors">Delivery Info</summary>
             <div className="px-4 py-3 text-sm text-(--color-text-muted) border-t border-(--color-border) space-y-1">
-              <p>📦 Free delivery on orders over $15</p>
-              <p>🚚 Standard delivery: $3.00</p>
-              <p>📍 Harare & surrounding areas</p>
+              <p>📦 Free delivery on orders over ${FREE_DELIVERY_THRESHOLD_USD}</p>
+              <p>🚚 Standard delivery: ${DELIVERY_FEE_USD.toFixed(2)} in {DELIVERY_AREA_LABEL}</p>
+              <p>🏬 Or collect free at {STORE_PICKUP_LOCATION.name}, {STORE_PICKUP_LOCATION.line1}</p>
             </div>
           </details>
           <details className="border border-(--color-border) rounded-xl overflow-hidden">

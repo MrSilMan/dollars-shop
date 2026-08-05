@@ -26,11 +26,13 @@ async function scanKeys(pattern: string): Promise<string[]> {
   return keys;
 }
 
-export async function invalidateProductCache(productSlug: string, categorySlug?: string) {
-  const keys: string[] = [`product:${productSlug}`, "products:featured"];
+export async function invalidateProductCache(productSlug: string, categorySlug?: string | string[]) {
+  // categories:images is derived from product photos, so it goes stale too.
+  const keys: string[] = [`product:${productSlug}`, "products:featured", "categories:images"];
 
-  if (categorySlug) {
-    const categoryKeys = await scanKeys(`products:category:${categorySlug}:*`);
+  const categorySlugs = Array.isArray(categorySlug) ? categorySlug : categorySlug ? [categorySlug] : [];
+  for (const slug of new Set(categorySlugs)) {
+    const categoryKeys = await scanKeys(`products:category:${slug}:*`);
     keys.push(...categoryKeys);
   }
 

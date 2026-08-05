@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, ShoppingBasket, LayoutGrid } from "lucide-react";
-import { categoryIconMap as slugIconMap } from "@/lib/categories";
+import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
+import { CategoryImage } from "@/components/store/CategoryImage";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   icon?: string | null;
+  image?: string | null;
 }
 
 interface HeroSlide {
@@ -42,9 +43,14 @@ interface HeroSectionProps {
   categories?: Category[];
   slides?: HeroSlide[];
   sidePromos?: SidePromoItem[];
+  /**
+   * Accepted payment methods, resolved on the server — the fallback copy below
+   * must not advertise a provider checkout is not currently offering.
+   */
+  paymentSummary?: string;
 }
 
-const defaultSlides: HeroSlide[] = [
+const buildDefaultSlides = (paymentSummary: string): HeroSlide[] => [
   {
     id: "default-1",
     tag: "⚡ Flash Deals",
@@ -75,7 +81,7 @@ const defaultSlides: HeroSlide[] = [
     id: "default-3",
     tag: "📱 Mobile Money",
     tagBg: "#ffffff33",
-    headline: "EcoCash & InnBucks\nAccepted",
+    headline: `${paymentSummary}\nAccepted`,
     sub: "Fast, secure checkout with Zimbabwe's favourite payment methods",
     ctaLabel: "Start Shopping",
     ctaHref: "/shop",
@@ -86,7 +92,7 @@ const defaultSlides: HeroSlide[] = [
   },
 ];
 
-const defaultSidePromos: SidePromoItem[] = [
+const buildDefaultSidePromos = (paymentSummary: string): SidePromoItem[] => [
   {
     id: "promo-1",
     label: "HOT DEALS",
@@ -99,7 +105,7 @@ const defaultSidePromos: SidePromoItem[] = [
   {
     id: "promo-2",
     label: "PAY YOUR WAY",
-    headline: "EcoCash &\nInnBucks",
+    headline: paymentSummary.replace(" & ", " &\n"),
     href: "/checkout",
     imageUrl: null,
     bgFrom: "#FF6A00",
@@ -123,9 +129,14 @@ const fallbackCategories: Category[] = [
   { id: "toys",                 name: "Toys",                 slug: "toys",                 icon: "🪀" },
 ];
 
-export function HeroSection({ categories = [], slides: slidesProp, sidePromos: sidePromosProp }: HeroSectionProps) {
-  const slides = (slidesProp && slidesProp.length > 0) ? slidesProp : defaultSlides;
-  const sidePromos = (sidePromosProp && sidePromosProp.length > 0) ? sidePromosProp : defaultSidePromos;
+export function HeroSection({
+  categories = [],
+  slides: slidesProp,
+  sidePromos: sidePromosProp,
+  paymentSummary = "EcoCash & Cash",
+}: HeroSectionProps) {
+  const slides = (slidesProp && slidesProp.length > 0) ? slidesProp : buildDefaultSlides(paymentSummary);
+  const sidePromos = (sidePromosProp && sidePromosProp.length > 0) ? sidePromosProp : buildDefaultSidePromos(paymentSummary);
 
   const [current, setCurrent] = useState(0);
 
@@ -158,16 +169,20 @@ export function HeroSection({ categories = [], slides: slidesProp, sidePromos: s
       <aside className="hidden lg:flex flex-col bg-white rounded-xl overflow-hidden shadow-sm h-85 sm:h-95 lg:h-105">
         <nav className="flex flex-col flex-1 divide-y divide-gray-50 py-1 overflow-y-auto">
           {sidebarCats.slice(0, 10).map((cat) => {
-            const Icon = slugIconMap[cat.slug] ?? ShoppingBasket;
             return (
               <Link
                 key={cat.id}
                 href={`/shop/${cat.slug}`}
                 className="group flex items-center gap-2.5 px-3 py-2.5 hover:bg-(--color-primary-light) transition-colors duration-150"
               >
-                <span className="w-5 h-5 flex items-center justify-center shrink-0 text-(--color-text-muted) group-hover:text-(--color-primary) transition-colors duration-150">
-                  <Icon size={14} />
-                </span>
+                <CategoryImage
+                  slug={cat.slug}
+                  name={cat.name}
+                  image={cat.image}
+                  size={20}
+                  iconSize={14}
+                  className="w-5 h-5 rounded-md text-(--color-text-muted) group-hover:text-(--color-primary) transition-colors duration-150"
+                />
                 <span className="flex-1 text-xs font-medium text-(--color-text-primary) group-hover:text-(--color-primary) leading-tight line-clamp-1">
                   {cat.name}
                 </span>

@@ -13,9 +13,10 @@ import {
   Users,
   ArrowRight,
   Activity,
+  Coins,
 } from "lucide-react";
 import Link from "next/link";
-import { formatUSD } from "@/lib/utils/currency";
+import { formatUSD, formatZWG } from "@/lib/utils/currency";
 import { RevenueChart } from "./_components/RevenueChart";
 import { canAccess, adminLandingPage } from "@/lib/permissions";
 
@@ -31,9 +32,18 @@ export default async function AdminDashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [totalRevenue, ordersToday, pendingOrders, lowStock, recentOrders, revenueData] =
+  // Revenue is reported per wallet: USD orders sum their USD total; ZiG-settled
+  // orders sum the ZWG collected (excluded from the USD figures and chart).
+  const [usdRevenueAgg, zwgRevenueAgg, ordersToday, pendingOrders, lowStock, recentOrders, revenueData] =
     await Promise.all([
-      prisma.order.aggregate({ _sum: { total: true }, where: { paymentStatus: "PAID" } }),
+      prisma.order.aggregate({
+        _sum: { total: true },
+        where: { paymentStatus: "PAID", transactions: { none: { currency: "ZWG", status: "COMPLETED" } } },
+      }),
+      prisma.paymentTransaction.aggregate({
+        _sum: { amount: true },
+        where: { currency: "ZWG", status: "COMPLETED", order: { is: { paymentStatus: "PAID" } } },
+      }),
       prisma.order.count({ where: { createdAt: { gte: today } } }),
       prisma.order.count({ where: { status: "PENDING" } }),
       prisma.product.count({ where: { stock: { lte: 10 }, isActive: true } }),
@@ -43,16 +53,24 @@ export default async function AdminDashboard() {
         include: { user: { select: { name: true, email: true } } },
       }),
       prisma.$queryRaw<{ date: string; revenue: number }[]>`
-        SELECT DATE("createdAt")::text as date, SUM(total)::float as revenue
-        FROM orders
-        WHERE "paymentStatus" = 'PAID' AND "createdAt" >= NOW() - INTERVAL '30 days'
-        GROUP BY DATE("createdAt")
+        SELECT DATE(o."createdAt")::text as date, SUM(o.total)::float as revenue
+        FROM orders o
+        WHERE o."paymentStatus" = 'PAID'
+          AND o."createdAt" >= NOW() - INTERVAL '30 days'
+          AND NOT EXISTS (
+            SELECT 1 FROM payment_transactions t
+            WHERE t."orderId" = o.id AND t.currency = 'ZWG' AND t.status = 'COMPLETED'
+          )
+        GROUP BY DATE(o."createdAt")
         ORDER BY date ASC
       `.catch((err) => {
         console.error("Failed to load revenue chart data:", err);
         return [];
       }),
     ]);
+
+  const usdRevenue = Number(usdRevenueAgg._sum.total ?? 0);
+  const zwgRevenue = Number(zwgRevenueAgg._sum.amount ?? 0);
 
   const now = new Date();
   const hour = now.getHours();
@@ -65,6 +83,60 @@ export default async function AdminDashboard() {
     day: "numeric",
   });
 
+  const stats = [
+    {
+      title: "Revenue (USD)",
+      value: formatUSD(usdRevenue),
+      icon: DollarSign,
+      color: "green" as const,
+      change: "Paid in USD",
+      changeType: "neutral" as const,
+    },
+    ...(zwgRevenue > 0
+      ? [
+          {
+            title: "Revenue (ZiG)",
+            value: formatZWG(zwgRevenue),
+            icon: Coins,
+            color: "teal" as const,
+            change: "Paid in ZiG",
+            changeType: "neutral" as const,
+          },
+        ]
+      : []),
+    {
+      title: "Orders Today",
+      value: ordersToday,
+      icon: ShoppingBag,
+      color: "blue" as const,
+      change: ordersToday > 0 ? `${ordersToday} new today` : "None yet",
+      changeType: ordersToday > 0 ? ("up" as const) : ("neutral" as const),
+    },
+    {
+      title: "Pending Orders",
+      value: pendingOrders,
+      icon: Clock,
+      color: "amber" as const,
+      change: pendingOrders > 0 ? "Needs review" : "All caught up",
+      changeType: pendingOrders > 0 ? ("down" as const) : ("neutral" as const),
+    },
+    {
+      title: "Low Stock",
+      value: lowStock,
+      icon: AlertTriangle,
+      color: lowStock > 0 ? ("red" as const) : ("green" as const),
+      change: lowStock > 0 ? "Needs attention" : "All good",
+      changeType: lowStock > 0 ? ("down" as const) : ("up" as const),
+    },
+  ];
+
+  // On two-column phones a trailing odd card would leave a hole — let it span.
+  const statsGridCls = [
+    "grid grid-cols-2 gap-3 sm:gap-4",
+    stats.length === 5 ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4",
+    stats.length % 2 === 1 ? "max-lg:[&>*:last-child]:col-span-2" : "",
+  ].join(" ");
+
   const quickActions = [
     { href: "/admin/products/new", label: "Add New Product", icon: Package,  colorCls: "bg-green-50 text-green-800" },
     { href: "/admin/orders",       label: "Manage Orders",   icon: ShoppingBag, colorCls: "bg-blue-50 text-blue-700" },
@@ -75,9 +147,9 @@ export default async function AdminDashboard() {
     <div className="space-y-6 max-w-7xl">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-(--color-text-primary)">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-(--color-text-primary)">
             {greeting}, Admin
           </h1>
           <p className="text-sm text-(--color-text-muted) mt-0.5">
@@ -86,7 +158,7 @@ export default async function AdminDashboard() {
         </div>
         <Link
           href="/admin/products/new"
-          className="flex items-center gap-2 bg-(--color-primary) hover:bg-(--color-primary-dark) text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm shrink-0"
+          className="flex items-center justify-center gap-2 bg-(--color-primary) hover:bg-(--color-primary-dark) text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm shrink-0"
         >
           <Package size={15} />
           Add Product
@@ -94,52 +166,23 @@ export default async function AdminDashboard() {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard
-          title="Total Revenue"
-          value={formatUSD(Number(totalRevenue._sum.total ?? 0))}
-          icon={DollarSign}
-          color="green"
-          change="All-time paid"
-          changeType="neutral"
-        />
-        <StatsCard
-          title="Orders Today"
-          value={ordersToday}
-          icon={ShoppingBag}
-          color="blue"
-          change={ordersToday > 0 ? `${ordersToday} new today` : "None yet"}
-          changeType={ordersToday > 0 ? "up" : "neutral"}
-        />
-        <StatsCard
-          title="Pending Orders"
-          value={pendingOrders}
-          icon={Clock}
-          color="amber"
-          change={pendingOrders > 0 ? "Needs review" : "All caught up"}
-          changeType={pendingOrders > 0 ? "down" : "neutral"}
-        />
-        <StatsCard
-          title="Low Stock Items"
-          value={lowStock}
-          icon={AlertTriangle}
-          color={lowStock > 0 ? "red" : "green"}
-          change={lowStock > 0 ? "Needs attention" : "All good"}
-          changeType={lowStock > 0 ? "down" : "up"}
-        />
+      <div className={statsGridCls}>
+        {stats.map((s) => (
+          <StatsCard key={s.title} {...s} />
+        ))}
       </div>
 
       {/* ── Chart + Insights ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
         {/* Revenue chart */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-(--color-border) p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-semibold text-base">Revenue Overview</h2>
-              <p className="text-xs text-(--color-text-muted) mt-0.5">Last 30 days</p>
+        <div className="xl:col-span-2 bg-white rounded-2xl border border-(--color-border) p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="min-w-0">
+              <h2 className="font-semibold text-base">Revenue Overview (USD)</h2>
+              <p className="text-xs text-(--color-text-muted) mt-0.5 truncate">Last 30 days · USD-settled orders</p>
             </div>
-            <span className="flex items-center gap-1.5 text-xs text-(--color-text-muted)">
+            <span className="flex items-center gap-1.5 text-xs text-(--color-text-muted) shrink-0">
               <span className="w-2 h-2 rounded-full bg-(--color-primary)" />
               Revenue
             </span>
@@ -155,7 +198,7 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Insights panel */}
-        <div className="bg-white rounded-2xl border border-(--color-border) p-6 flex flex-col gap-5">
+        <div className="bg-white rounded-2xl border border-(--color-border) p-4 sm:p-6 flex flex-col gap-5">
 
           {/* Quick actions */}
           <div>
@@ -217,7 +260,7 @@ export default async function AdminDashboard() {
 
       {/* ── Recent orders ── */}
       <div className="bg-white rounded-2xl border border-(--color-border) overflow-hidden">
-        <div className="px-6 py-4 border-b border-(--color-border) flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-(--color-border) flex items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold text-base">Recent Orders</h2>
             <p className="text-xs text-(--color-text-muted) mt-0.5">Showing last 10 orders</p>

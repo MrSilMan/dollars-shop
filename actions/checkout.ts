@@ -4,15 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { CheckoutFormSchema, type CheckoutFormData } from "@/schemas/checkout.schema";
 import { generateOrderNumber } from "@/lib/utils/order";
-import { initiateEcoCashPayment } from "@/lib/payments/ecocash";
+import { initiateEcoCashCharge, normalizeEcoCashMsisdn } from "@/lib/payments/ecocash";
 import { initiateInnBucksPayment } from "@/lib/payments/innbucks";
+import { isInnBucksEnabled } from "@/lib/payments/providers";
+import { getAppSettings } from "@/lib/app-settings";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
+import { calculateDeliveryFee } from "@/lib/delivery";
+import { convertUsdToZwg } from "@/lib/utils/currency";
 import { logger } from "@/lib/logger";
 import { getCartItems, clearCart } from "./cart";
 import { sendOrderConfirmationEmail, type OrderEmailData } from "@/lib/email";
 import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
 
 export type PaymentInitResult =
-  | { success: true; method: "ECOCASH"; transactionId: string; amount: number }
+  | { success: true; method: "ECOCASH"; transactionId: string; amount: number; currency: "USD" | "ZWG"; chargeAmount: number; exchangeRate: number | null }
   | { success: true; method: "INNBUCKS"; checkoutUrl: string; qrCode?: string; transactionRef: string; amount: number }
   | { success: true; method: "CASH_ON_DELIVERY"; orderNumber: string; amount: number }
   | { success: false; error: string };
@@ -21,20 +26,44 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
   const parsed = CheckoutFormSchema.safeParse(data);
   if (!parsed.success) return { error: "Invalid form data" };
 
+  // Checkout hides InnBucks while it is unconfigured, but the action is still
+  // reachable directly — reject before anything is committed.
+  if (parsed.data.method === "INNBUCKS" && !isInnBucksEnabled()) {
+    return { error: "InnBucks is not available right now. Please choose another payment method." };
+  }
+
   const session = await auth();
   const cartItems = await getCartItems();
   if (cartItems.length === 0) return { error: "Cart is empty" };
 
-  const DELIVERY_FEE = parseFloat(process.env.DELIVERY_FEE_USD ?? "3.00");
-  const FREE_THRESHOLD = parseFloat(process.env.FREE_DELIVERY_THRESHOLD_USD ?? "15.00");
+  const fulfillmentType = parsed.data.fulfillmentType ?? "DELIVERY";
+  const isPickup = fulfillmentType === "PICKUP";
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + Number(item.product.price) * item.quantity,
     0
   );
-  const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
+  const deliveryFee = calculateDeliveryFee(subtotal, isPickup);
   const discount = parsed.data.discountAmount ?? 0;
   const total = Math.max(0, subtotal + deliveryFee - discount);
+
+  // For pickup the "shipping address" is the shop itself, so receipts, emails
+  // and the admin panel all render a sensible address without special cases.
+  const orderAddress = isPickup
+    ? {
+        line1: STORE_PICKUP_LOCATION.line1,
+        line2: null,
+        city: STORE_PICKUP_LOCATION.city,
+        province: STORE_PICKUP_LOCATION.province,
+        country: STORE_PICKUP_LOCATION.country,
+      }
+    : {
+        line1: parsed.data.line1!,
+        line2: parsed.data.line2 ?? null,
+        city: parsed.data.city!,
+        province: parsed.data.province!,
+        country: "Zimbabwe",
+      };
 
   try {
     const orderNumber = generateOrderNumber();
@@ -60,6 +89,7 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
           guestEmail: session ? null : parsed.data.email,
           guestPhone: session ? null : parsed.data.phone,
           paymentMethod: parsed.data.method as "ECOCASH" | "INNBUCKS" | "CASH_ON_DELIVERY",
+          fulfillmentType,
           status: "PENDING",
           paymentStatus: "UNPAID",
           subtotal,
@@ -72,11 +102,7 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
             name: parsed.data.name,
             email: parsed.data.email,
             phone: parsed.data.phone,
-            line1: parsed.data.line1,
-            line2: parsed.data.line2 ?? null,
-            city: parsed.data.city,
-            province: parsed.data.province,
-            country: "Zimbabwe",
+            ...orderAddress,
           },
           items: {
             create: cartItems.map((item) => ({
@@ -135,6 +161,7 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
             orderNumber,
             createdAt: order.createdAt,
             paymentMethod: parsed.data.method,
+            fulfillmentType,
             customerName: parsed.data.name,
             customerPhone: parsed.data.phone,
             items,
@@ -142,13 +169,7 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
             deliveryFee,
             discount,
             total,
-            shippingAddress: {
-              line1: parsed.data.line1,
-              line2: parsed.data.line2,
-              city: parsed.data.city,
-              province: parsed.data.province,
-              country: "Zimbabwe",
-            },
+            shippingAddress: orderAddress,
             ...branding,
           };
           return generateReceiptPdf(receiptData);
@@ -164,12 +185,8 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
             discount,
             total,
             paymentMethod: parsed.data.method,
-            shippingAddress: {
-              line1: parsed.data.line1,
-              line2: parsed.data.line2,
-              city: parsed.data.city,
-              province: parsed.data.province,
-            },
+            fulfillmentType,
+            shippingAddress: orderAddress,
             receiptPdf,
           };
           return sendOrderConfirmationEmail(emailData);
@@ -189,39 +206,85 @@ export async function createOrder(data: CheckoutFormData): Promise<{ orderId: st
 
 export async function initiatePayment(
   orderId: string,
-  customerPhone: string
+  customerPhone: string,
+  paymentCurrency: "USD" | "ZWG" = "USD"
 ): Promise<PaymentInitResult> {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: "Order not found" };
+  if (order.paymentStatus === "PAID") return { success: false, error: "This order has already been paid" };
 
   if (order.paymentMethod === "CASH_ON_DELIVERY") {
     return { success: true, method: "CASH_ON_DELIVERY", orderNumber: order.orderNumber, amount: Number(order.total) };
   }
 
+  // Covers retries on orders placed while the provider was still enabled.
+  if (order.paymentMethod === "INNBUCKS" && !isInnBucksEnabled()) {
+    return { success: false, error: "InnBucks is not available right now. Please contact us to complete this order." };
+  }
+
   try {
     if (order.paymentMethod === "ECOCASH") {
-      const result = await initiateEcoCashPayment({
-        merchantCode: process.env.ECOCASH_MERCHANT_CODE!,
-        merchantPin: process.env.ECOCASH_MERCHANT_PIN!,
-        merchantNumber: process.env.ECOCASH_MERCHANT_NUMBER!,
-        customerPhone,
-        amount: Number(order.total),
-        reference: order.orderNumber,
-        narrative: `Dollar Shop Order ${order.orderNumber}`,
+      const msisdn = normalizeEcoCashMsisdn(customerPhone);
+      if (!msisdn) return { success: false, error: "Enter a valid EcoCash number (07X XXXXXXX)" };
+
+      // Prices are USD. For a ZWG charge, convert the total at the current
+      // admin-set rate (read server-side, never trusted from the client) and
+      // charge that ZWG amount instead.
+      const currency = paymentCurrency;
+      let chargeAmount = Number(order.total);
+      let exchangeRate: number | null = null;
+      if (currency === "ZWG") {
+        const { zwgRate } = await getAppSettings();
+        if (!zwgRate || zwgRate <= 0) return { success: false, error: "ZWG payments are temporarily unavailable" };
+        exchangeRate = zwgRate;
+        chargeAmount = convertUsdToZwg(Number(order.total), zwgRate);
+      }
+
+      // New correlator per attempt — EcoCash rejects duplicate clientCorrelators,
+      // so a retry after a failed/cancelled prompt needs a fresh one.
+      const clientCorrelator = `${order.orderNumber}-${Date.now()}`;
+      await prisma.paymentTransaction.create({
+        data: {
+          orderId: order.id,
+          provider: "ECOCASH",
+          clientCorrelator,
+          msisdn,
+          amount: chargeAmount,
+          currency,
+          exchangeRate,
+        },
       });
 
-      if (result.status === "FAILED") return { success: false, error: "Failed to send payment request" };
+      const result = await initiateEcoCashCharge({
+        clientCorrelator,
+        msisdn,
+        amount: chargeAmount,
+        currency,
+        referenceCode: order.orderNumber,
+        description: `Dollar Shop Order ${order.orderNumber}`,
+      });
+
+      if (!result.accepted) {
+        await prisma.paymentTransaction.update({
+          where: { clientCorrelator },
+          data: { status: "FAILED", failureReason: result.error },
+        });
+        return { success: false, error: result.error };
+      }
 
       await prisma.order.update({
         where: { id: orderId },
-        data: { paymentRef: result.transactionId, paymentStatus: "PENDING_VERIFICATION" },
+        data: { paymentRef: clientCorrelator, paymentStatus: "PENDING_VERIFICATION" },
       });
 
       return {
         success: true,
         method: "ECOCASH",
-        transactionId: result.transactionId,
+        transactionId: clientCorrelator,
         amount: Number(order.total),
+        currency,
+        chargeAmount,
+        exchangeRate,
       };
     }
 

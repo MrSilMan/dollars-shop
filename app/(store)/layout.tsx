@@ -36,7 +36,16 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         logoUrl={settings.logoUrl ?? undefined}
       />
       <main className="flex-1 pb-16 md:pb-0">{children}</main>
-      <Footer footerText={settings.footerText} logoUrl={settings.logoUrl ?? undefined} />
+      <Footer
+        footerText={settings.footerText}
+        logoUrl={settings.logoUrl ?? undefined}
+        contactAddress={settings.contactAddress}
+        contactPhone={settings.contactPhone}
+        contactEmail={settings.contactEmail}
+        contactHours={settings.contactHours}
+        facebookUrl={settings.facebookUrl}
+        instagramUrl={settings.instagramUrl}
+      />
       <WhatsAppButton />
       <BottomNav isAuthenticated={!!session?.user} />
     </CartCountProvider>

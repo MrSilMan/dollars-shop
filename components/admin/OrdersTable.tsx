@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
-import { formatUSD } from "@/lib/utils/currency";
+import { formatUSD, formatZWG } from "@/lib/utils/currency";
 
 interface Order {
   id: string;
@@ -15,6 +15,7 @@ interface Order {
   user?: { name?: string | null; email: string } | null;
   guestEmail?: string | null;
   shippingAddress?: unknown;
+  payment?: { currency: string; amount: number; exchangeRate: number | null } | null;
 }
 
 const statusConfig: Record<string, { badge: string; dot: string }> = {
@@ -51,7 +52,66 @@ export function OrdersTable({ orders, onRowClick }: { orders: Order[]; onRowClic
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Phone: stacked cards — a 6-column table cannot breathe under ~640px */}
+    <ul className="md:hidden divide-y divide-(--color-border)">
+      {orders.map((order) => {
+        const st = statusConfig[order.status] ?? { badge: "bg-gray-100 text-gray-600", dot: "bg-gray-400" };
+        const pm = paymentConfig[order.paymentStatus] ?? "bg-gray-100 text-gray-600";
+
+        return (
+          <li key={order.id}>
+            <div
+              onClick={() => onRowClick?.(order.id)}
+              className={`px-4 py-3.5 flex flex-col gap-2 ${onRowClick ? "cursor-pointer active:bg-green-50/60" : ""}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/orders?id=${order.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="price text-xs font-semibold tracking-wide text-(--color-primary) hover:underline break-all"
+                  >
+                    {order.orderNumber}
+                  </Link>
+                  <p className="text-sm font-medium text-(--color-text-primary) leading-tight mt-1 truncate">
+                    {order.user?.name ?? (order.shippingAddress as Record<string, string> | null)?.name ?? "Guest"}
+                  </p>
+                  <p className="text-xs text-(--color-text-muted) truncate">
+                    {order.user?.email ?? order.guestEmail ?? ""}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="price text-sm font-bold text-(--color-text-primary)">
+                    {formatUSD(Number(order.total))}
+                  </p>
+                  {order.payment?.currency === "ZWG" && (
+                    <p className="price text-[11px] font-semibold text-teal-600 mt-0.5 whitespace-nowrap">
+                      {formatZWG(order.payment.amount)} · ZiG
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.75 rounded-full ${st.badge}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.dot}`} />
+                  {order.status}
+                </span>
+                <span className={`inline-flex text-[11px] font-medium px-2 py-0.75 rounded-full ${pm}`}>
+                  {order.paymentStatus.replace(/_/g, " ")}
+                </span>
+                <span className="ml-auto text-[11px] text-(--color-text-muted) whitespace-nowrap">
+                  {new Intl.DateTimeFormat("en-ZW", { dateStyle: "medium" }).format(new Date(order.createdAt))}
+                </span>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+
+    <div className="hidden md:block overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-(--color-surface-alt)">
@@ -110,6 +170,11 @@ export function OrdersTable({ orders, onRowClick }: { orders: Order[]; onRowClic
                   <span className="price font-bold text-(--color-text-primary) text-sm">
                     {formatUSD(Number(order.total))}
                   </span>
+                  {order.payment?.currency === "ZWG" && (
+                    <p className="price text-xs font-semibold text-teal-600 mt-0.5 whitespace-nowrap">
+                      {formatZWG(order.payment.amount)} · ZiG
+                    </p>
+                  )}
                 </td>
 
                 <td className="px-5 py-4 text-(--color-text-muted) whitespace-nowrap text-xs">
@@ -123,5 +188,6 @@ export function OrdersTable({ orders, onRowClick }: { orders: Order[]; onRowClic
         </tbody>
       </table>
     </div>
+    </>
   );
 }

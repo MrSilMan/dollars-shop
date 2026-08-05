@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRef, useCallback, useEffect } from "react";
-import { ChevronLeft, ChevronRight, ShoppingBasket } from "lucide-react";
-import { categoryIconMap } from "@/lib/categories";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CategoryImage } from "@/components/store/CategoryImage";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   icon?: string | null;
+  image?: string | null;
 }
 
 interface CategoryNavProps {
@@ -39,7 +40,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
   const pillIdle =
     "bg-white text-(--color-text-primary) border-(--color-border) hover:border-(--color-primary) hover:text-(--color-primary)";
   const navBtn =
-    "shrink-0 w-7 h-7 flex items-center justify-center rounded-full border border-(--color-border) bg-white text-(--color-text-muted) hover:border-(--color-primary) hover:text-(--color-primary) transition-colors duration-150";
+    "shrink-0 w-8 h-8 flex items-center justify-center rounded-full border border-(--color-border) bg-white text-(--color-text-muted) hover:border-(--color-primary) hover:text-(--color-primary) transition-colors duration-150";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -56,7 +57,6 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
           All Products
         </Link>
         {categories.map((cat) => {
-          const Icon = categoryIconMap[cat.slug] ?? ShoppingBasket;
           return (
             <Link
               key={cat.id}
@@ -64,7 +64,14 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
               data-active={activeSlug === cat.slug || undefined}
               className={`${pillBase} ${activeSlug === cat.slug ? pillActive : pillIdle}`}
             >
-              <Icon size={13} aria-hidden="true" />
+              <CategoryImage
+                slug={cat.slug}
+                name={cat.name}
+                image={cat.image}
+                size={28}
+                iconSize={14}
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full -ml-2"
+              />
               {cat.name}
             </Link>
           );

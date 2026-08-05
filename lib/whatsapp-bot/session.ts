@@ -8,6 +8,7 @@ export type BotState =
   | "CHECKOUT_NAME"
   | "CHECKOUT_EMAIL"
   | "CHECKOUT_PHONE"
+  | "CHECKOUT_FULFILLMENT"
   | "CHECKOUT_ADDRESS_LINE1"
   | "CHECKOUT_ADDRESS_LINE2"
   | "CHECKOUT_CITY"
@@ -25,6 +26,8 @@ export interface CheckoutDraft {
   name?: string;
   email?: string;
   phone?: string;
+  /** PICKUP skips the address questions — the order is collected in store. */
+  fulfillmentType?: "DELIVERY" | "PICKUP";
   line1?: string;
   line2?: string;
   city?: string;

@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { verifyInnBucksWebhook } from "@/lib/payments/innbucks";
-import { verifyEcoCashWebhook } from "@/lib/payments/ecocash";
-import { sendPaymentReceivedEmail, type OrderEmailData } from "@/lib/email";
-import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
+import { confirmEcoCashPayment, markOrderPaid } from "@/lib/payments/fulfillment";
 
 const VALID_PROVIDERS = ["innbucks", "ecocash"] as const;
 
@@ -15,112 +13,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
   }
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   try {
-    if (provider === "innbucks") {
-      const signature = req.headers.get("x-innbucks-signature") ?? "";
-      const valid = await verifyInnBucksWebhook(body, signature);
-      if (!valid) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-
     if (provider === "ecocash") {
-      const token = req.headers.get("x-ecocash-token") ?? "";
-      if (!verifyEcoCashWebhook(token)) {
-        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      // EcoCash does not sign its notifications, so the payload is never
+      // trusted: the clientCorrelator is only a hint that triggers a
+      // server-side Query Transaction call, which decides the real outcome.
+      const clientCorrelator =
+        typeof body.clientCorrelator === "string" ? body.clientCorrelator : null;
+      if (!clientCorrelator) {
+        return NextResponse.json({ error: "No clientCorrelator" }, { status: 400 });
       }
+
+      const status = await confirmEcoCashPayment(clientCorrelator);
+      if (status === null) {
+        return NextResponse.json({ error: "Unknown transaction" }, { status: 404 });
+      }
+
+      logger.info("EcoCash webhook processed", { clientCorrelator, status });
+      return NextResponse.json({ received: true });
     }
 
-    const reference = body.reference ?? body.clientCorrelator;
+    // InnBucks — authenticated by HMAC signature, payload is trusted
+    const signature = req.headers.get("x-innbucks-signature") ?? "";
+    const valid = await verifyInnBucksWebhook(body, signature);
+    if (!valid) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+
+    const reference = (body.reference ?? body.clientCorrelator) as string | undefined;
     if (!reference) return NextResponse.json({ error: "No reference" }, { status: 400 });
 
     const order = await prisma.order.findUnique({ where: { orderNumber: reference } });
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-    // Idempotency: if already paid, acknowledge without reprocessing
-    if (order.paymentStatus === "PAID") {
-      return NextResponse.json({ received: true });
-    }
-
-    const isPaid =
-      provider === "ecocash"
-        ? body.transactionOperationStatus === "Charged"
-        : body.status === "SUCCESS";
-
-    if (isPaid) {
-      const items = await prisma.$transaction(async (tx) => {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { paymentStatus: "PAID", status: "CONFIRMED", paymentRef: body.transactionId ?? body.transactionRef },
-        });
-
-        const orderItems = await tx.orderItem.findMany({ where: { orderId: order.id } });
-        for (const item of orderItems) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
-        return orderItems;
-      });
-
-      logger.info("Payment webhook processed", { orderId: order.id, provider, reference });
-
-      // Fire payment-confirmed email (non-blocking)
-      const addr = order.shippingAddress as { name?: string; email?: string; phone?: string; line1?: string; line2?: string; city?: string; province?: string; country?: string };
-      const customerEmail = addr.email ?? order.guestEmail;
-      if (customerEmail) {
-        const receiptItems = items.map(i => ({
-          name: i.productName,
-          sku: i.productSku,
-          quantity: i.quantity,
-          price: Number(i.price),
-          subtotal: Number(i.price) * i.quantity,
-          variantSnapshot: i.variantSnapshot,
-        }));
-
-        resolveReceiptBranding()
-          .then((branding) => {
-            const receiptData: ReceiptData = {
-              orderNumber: order.orderNumber,
-              createdAt: order.createdAt,
-              paymentMethod: order.paymentMethod,
-              customerName: addr.name ?? "Customer",
-              customerPhone: addr.phone,
-              items: receiptItems,
-              subtotal: Number(order.subtotal),
-              deliveryFee: Number(order.deliveryFee),
-              discount: Number(order.discount),
-              total: Number(order.total),
-              shippingAddress: {
-                line1: addr.line1 ?? "",
-                line2: addr.line2,
-                city: addr.city ?? "",
-                province: addr.province ?? "",
-                country: addr.country ?? "Zimbabwe",
-              },
-              ...branding,
-            };
-            return generateReceiptPdf(receiptData);
-          })
-          .then((receiptPdf) => {
-            const emailData: OrderEmailData = {
-              orderNumber: order.orderNumber,
-              customerName: addr.name ?? "Customer",
-              customerEmail,
-              items: receiptItems,
-              subtotal: Number(order.subtotal),
-              deliveryFee: Number(order.deliveryFee),
-              discount: Number(order.discount),
-              total: Number(order.total),
-              paymentMethod: order.paymentMethod,
-              shippingAddress: { line1: addr.line1 ?? "", line2: addr.line2, city: addr.city ?? "", province: addr.province ?? "" },
-              receiptPdf,
-            };
-            return sendPaymentReceivedEmail(emailData);
-          })
-          .catch(() => {});
-      }
+    if (body.status === "SUCCESS") {
+      const paymentRef = (body.transactionId ?? body.transactionRef) as string | undefined;
+      await markOrderPaid(order.id, paymentRef);
+      logger.info("InnBucks webhook processed", { orderId: order.id, reference });
     }
 
     return NextResponse.json({ received: true });

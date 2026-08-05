@@ -7,17 +7,17 @@ import { CheckoutFormSchema, type CheckoutFormData } from "@/schemas/checkout.sc
 import { createOrder, initiatePayment } from "@/actions/checkout";
 import { EcoCashWidget } from "./EcoCashWidget";
 import { InnBucksWidget } from "./InnBucksWidget";
-import { formatUSD } from "@/lib/utils/currency";
+import { formatUSD, formatZWG, convertUsdToZwg } from "@/lib/utils/currency";
 import {
   ChevronRight, ChevronLeft, Tag, X, Loader2, CheckCircle2,
   User, Mail, Phone, MapPin, Building2, Map, CreditCard, ClipboardList, Star,
-  ShieldCheck, Truck, BadgeCheck,
+  ShieldCheck, Truck, BadgeCheck, Store, Clock,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ProductImage as Image } from "@/components/shared/ProductImage";
 import { DeliveryProgressBar } from "@/app/(store)/cart/_components/DeliveryProgressBar";
-
-const FREE_THRESHOLD = 15;
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
+import { FREE_DELIVERY_THRESHOLD_USD, DELIVERY_AREA_LABEL } from "@/lib/delivery";
 
 const PROVINCES = [
   "Harare","Bulawayo","Manicaland","Mashonaland Central","Mashonaland East",
@@ -40,6 +40,9 @@ interface CheckoutFormProps {
   defaultPhone?: string;
   defaultName?: string;
   blurMap?: Record<string, string>;
+  zwgRate: number;
+  /** Resolved on the server — InnBucks is hidden until it has real credentials. */
+  innBucksEnabled: boolean;
 }
 
 interface AppliedCoupon {
@@ -50,16 +53,18 @@ interface AppliedCoupon {
   discountAmount: number;
 }
 
-const STEPS = ["Contact", "Address", "Payment", "Review"];
+const stepLabels = (isPickup: boolean) => ["Contact", isPickup ? "Pickup" : "Address", "Payment", "Review"];
 
 export function CheckoutForm({
   cartItems,
   subtotal: initialSubtotal,
-  deliveryFee,
+  deliveryFee: deliveryFeeProp,
   defaultEmail,
   defaultPhone,
   defaultName,
   blurMap = {},
+  zwgRate,
+  innBucksEnabled,
 }: Omit<CheckoutFormProps, "total"> & { subtotal: number }) {
   const [step, setStep] = useState(0);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -75,7 +80,6 @@ export function CheckoutForm({
   const router = useRouter();
 
   const discount = appliedCoupon?.discountAmount ?? 0;
-  const total = Math.max(0, initialSubtotal + deliveryFee - discount);
 
   const form = useForm<CheckoutFormData>({
     resolver: zodResolver(CheckoutFormSchema),
@@ -84,8 +88,19 @@ export function CheckoutForm({
       email: defaultEmail ?? "",
       phone: defaultPhone ?? "",
       method: "ECOCASH",
+      paymentCurrency: "USD",
+      fulfillmentType: "DELIVERY",
     },
   });
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const w = form.watch();
+
+  // Collecting in store is always free, whatever the cart is worth.
+  const isPickup = w.fulfillmentType === "PICKUP";
+  const deliveryFee = isPickup ? 0 : deliveryFeeProp;
+  const total = Math.max(0, initialSubtotal + deliveryFee - discount);
+  const zwgTotal = convertUsdToZwg(total, zwgRate);
 
   const next = async () => {
     const paymentFields: (keyof CheckoutFormData)[] =
@@ -95,7 +110,7 @@ export function CheckoutForm({
 
     const fields: (keyof CheckoutFormData)[][] = [
       ["name", "email", "phone"],
-      ["line1", "city", "province"],
+      isPickup ? ["fulfillmentType"] : ["line1", "city", "province"],
       paymentFields,
       [],
     ];
@@ -161,7 +176,11 @@ export function CheckoutForm({
       }
 
       const phone = data.method === "ECOCASH" ? data.ecocashNumber! : data.innbucksNumber!;
-      const payment = await initiatePayment(result.orderId, phone || data.phone);
+      const payment = await initiatePayment(
+        result.orderId,
+        phone || data.phone,
+        data.method === "ECOCASH" ? (data.paymentCurrency ?? "USD") : "USD"
+      );
       if (!payment.success) { setError(payment.error); setLoading(false); return; }
       setPaymentResult(payment);
     } catch {
@@ -176,7 +195,9 @@ export function CheckoutForm({
       <EcoCashWidget
         orderId={orderId!}
         transactionId={paymentResult.transactionId}
-        amount={paymentResult.amount}
+        amount={paymentResult.chargeAmount}
+        currency={paymentResult.currency}
+        usdAmount={paymentResult.amount}
         customerPhone={form.getValues("ecocashNumber") || form.getValues("phone")}
         onSuccess={() => router.push(`/checkout/success?order=${orderId}`)}
         onFailed={() => setError("Payment failed. Please try again.")}
@@ -198,8 +219,7 @@ export function CheckoutForm({
     );
   }
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const w = form.watch();
+  const STEPS = stepLabels(isPickup);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -262,42 +282,92 @@ export function CheckoutForm({
             </div>
           )}
 
-          {/* Step 1: Address */}
+          {/* Step 1: Delivery or pickup */}
           {step === 1 && (
             <div className="space-y-4">
               <h2 className="font-semibold text-lg flex items-center gap-2">
                 <span className="w-7 h-7 rounded-full bg-(--color-primary-light) flex items-center justify-center shrink-0">
-                  <MapPin size={14} className="text-(--color-primary)" />
+                  {isPickup
+                    ? <Store size={14} className="text-(--color-primary)" />
+                    : <MapPin size={14} className="text-(--color-primary)" />}
                 </span>
-                Delivery Address
+                How would you like to get your order?
               </h2>
-              <Field label="Street Address" error={form.formState.errors.line1?.message}>
-                <div className="relative">
-                  <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
-                  <input {...form.register("line1")} type="text" placeholder="123 Main Street" className={iconInputCls} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FulfillmentOption
+                  active={!isPickup}
+                  onClick={() => form.setValue("fulfillmentType", "DELIVERY")}
+                  icon={<Truck size={18} />}
+                  label="Deliver to me"
+                  desc={`To your door in ${DELIVERY_AREA_LABEL} — 2–4 business days`}
+                  note={deliveryFeeProp === 0 ? "FREE delivery" : `${formatUSD(deliveryFeeProp)} delivery`}
+                />
+                <FulfillmentOption
+                  active={isPickup}
+                  onClick={() => form.setValue("fulfillmentType", "PICKUP")}
+                  icon={<Store size={18} />}
+                  label={`Collect at ${STORE_PICKUP_LOCATION.name}`}
+                  desc="Pick it up in store once we tell you it's ready"
+                  note="Always FREE"
+                />
+              </div>
+
+              {isPickup ? (
+                <div className="bg-(--color-surface-alt) rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <MapPin size={15} className="text-(--color-primary) mt-0.5 shrink-0" />
+                    <div className="text-sm leading-relaxed">
+                      <p className="font-semibold">{STORE_PICKUP_LOCATION.name}</p>
+                      <p className="text-(--color-text-muted)">{STORE_PICKUP_LOCATION.line1}</p>
+                      <p className="text-(--color-text-muted)">
+                        {STORE_PICKUP_LOCATION.city}, {STORE_PICKUP_LOCATION.country}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-(--color-text-muted)">
+                    <Clock size={15} className="shrink-0" />
+                    <span>{STORE_PICKUP_LOCATION.hours}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-(--color-text-muted)">
+                    <Phone size={15} className="shrink-0" />
+                    <span>{STORE_PICKUP_LOCATION.phone}</span>
+                  </div>
+                  <p className="text-xs text-(--color-text-muted) bg-white rounded-lg px-3 py-2 border border-(--color-border)">
+                    We&apos;ll message you as soon as your order is packed. Bring your order number and an ID to collect.
+                  </p>
                 </div>
-              </Field>
-              <Field label="Apartment / Suite (optional)">
-                <div className="relative">
-                  <Building2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
-                  <input {...form.register("line2")} type="text" placeholder="Flat 4B" className={iconInputCls} />
+              ) : (
+                <div className="space-y-4">
+                  <Field label="Street Address" error={form.formState.errors.line1?.message}>
+                    <div className="relative">
+                      <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
+                      <input {...form.register("line1")} type="text" placeholder="123 Main Street" className={iconInputCls} />
+                    </div>
+                  </Field>
+                  <Field label="Apartment / Suite (optional)">
+                    <div className="relative">
+                      <Building2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
+                      <input {...form.register("line2")} type="text" placeholder="Flat 4B" className={iconInputCls} />
+                    </div>
+                  </Field>
+                  <Field label="City" error={form.formState.errors.city?.message}>
+                    <div className="relative">
+                      <Building2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
+                      <input {...form.register("city")} type="text" placeholder="Harare" className={iconInputCls} />
+                    </div>
+                  </Field>
+                  <Field label="Province" error={form.formState.errors.province?.message}>
+                    <div className="relative">
+                      <Map size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none z-10" />
+                      <select {...form.register("province")} className={`${iconInputCls} appearance-none`}>
+                        <option value="">Select province…</option>
+                        {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                  </Field>
                 </div>
-              </Field>
-              <Field label="City" error={form.formState.errors.city?.message}>
-                <div className="relative">
-                  <Building2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
-                  <input {...form.register("city")} type="text" placeholder="Harare" className={iconInputCls} />
-                </div>
-              </Field>
-              <Field label="Province" error={form.formState.errors.province?.message}>
-                <div className="relative">
-                  <Map size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none z-10" />
-                  <select {...form.register("province")} className={`${iconInputCls} appearance-none`}>
-                    <option value="">Select province…</option>
-                    {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-              </Field>
+              )}
             </div>
           )}
 
@@ -322,40 +392,70 @@ export function CheckoutForm({
                   color="red"
                 >
                   {w.method === "ECOCASH" && (
-                    <Field label="EcoCash Number" error={form.formState.errors.ecocashNumber?.message}>
-                      <div className="relative">
-                        <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
-                        <input {...form.register("ecocashNumber")} type="tel" placeholder="077XXXXXXX" className={iconInputCls} />
+                    <div className="space-y-3">
+                      <Field label="EcoCash Number" error={form.formState.errors.ecocashNumber?.message}>
+                        <div className="relative">
+                          <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
+                          <input {...form.register("ecocashNumber")} type="tel" placeholder="077XXXXXXX" className={iconInputCls} />
+                        </div>
+                      </Field>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-(--color-text-primary)">Pay in</label>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <CurrencyChoice
+                            active={(w.paymentCurrency ?? "USD") === "USD"}
+                            onClick={() => form.setValue("paymentCurrency", "USD")}
+                            flag="🇺🇸"
+                            label="US Dollar"
+                            amount={formatUSD(total)}
+                          />
+                          <CurrencyChoice
+                            active={w.paymentCurrency === "ZWG"}
+                            onClick={() => form.setValue("paymentCurrency", "ZWG")}
+                            flag="🇿🇼"
+                            label="ZiG"
+                            amount={formatZWG(zwgTotal)}
+                          />
+                        </div>
+                        {w.paymentCurrency === "ZWG" && (
+                          <p className="flex items-center gap-1.5 text-xs text-(--color-text-muted) bg-(--color-surface-alt) rounded-lg px-2.5 py-2">
+                            <ShieldCheck size={13} className="text-(--color-success) shrink-0" />
+                            You&apos;ll be charged <strong className="price">{formatZWG(zwgTotal)}</strong> at today&apos;s rate of US$1 = {zwgRate} ZiG.
+                          </p>
+                        )}
                       </div>
-                    </Field>
+                    </div>
                   )}
                 </PaymentOption>
 
-                <PaymentOption
-                  value="INNBUCKS"
-                  current={w.method}
-                  onChange={() => form.setValue("method", "INNBUCKS")}
-                  label="InnBucks"
-                  desc="Pay via InnBucks app — push or QR code"
-                  emoji="💳"
-                  color="blue"
-                >
-                  {w.method === "INNBUCKS" && (
-                    <Field label="InnBucks Number (optional)">
-                      <div className="relative">
-                        <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
-                        <input {...form.register("innbucksNumber")} type="tel" placeholder="077XXXXXXX" className={iconInputCls} />
-                      </div>
-                    </Field>
-                  )}
-                </PaymentOption>
+                {innBucksEnabled && (
+                  <PaymentOption
+                    value="INNBUCKS"
+                    current={w.method}
+                    onChange={() => form.setValue("method", "INNBUCKS")}
+                    label="InnBucks"
+                    desc="Pay via InnBucks app — push or QR code"
+                    emoji="💳"
+                    color="blue"
+                  >
+                    {w.method === "INNBUCKS" && (
+                      <Field label="InnBucks Number (optional)">
+                        <div className="relative">
+                          <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
+                          <input {...form.register("innbucksNumber")} type="tel" placeholder="077XXXXXXX" className={iconInputCls} />
+                        </div>
+                      </Field>
+                    )}
+                  </PaymentOption>
+                )}
 
                 <PaymentOption
                   value="CASH_ON_DELIVERY"
                   current={w.method}
                   onChange={() => form.setValue("method", "CASH_ON_DELIVERY")}
-                  label="Cash on Delivery"
-                  desc="Pay with cash when your order arrives"
+                  label={isPickup ? "Cash on Collection" : "Cash on Delivery"}
+                  desc={isPickup ? "Pay with cash in store when you collect" : "Pay with cash when your order arrives"}
                   emoji="💵"
                   color="amber"
                 />
@@ -412,10 +512,19 @@ export function CheckoutForm({
                 <p><span className="text-(--color-text-muted)">Name:</span> {w.name}</p>
                 <p><span className="text-(--color-text-muted)">Email:</span> {w.email}</p>
                 <p><span className="text-(--color-text-muted)">Phone:</span> {w.phone}</p>
-                <p><span className="text-(--color-text-muted)">Address:</span> {w.line1}{w.line2 ? `, ${w.line2}` : ""}, {w.city}, {w.province}</p>
+                {isPickup ? (
+                  <p>
+                    <span className="text-(--color-text-muted)">Collect at:</span>{" "}
+                    {STORE_PICKUP_LOCATION.name}, {STORE_PICKUP_LOCATION.line1}, {STORE_PICKUP_LOCATION.city}
+                  </p>
+                ) : (
+                  <p><span className="text-(--color-text-muted)">Address:</span> {w.line1}{w.line2 ? `, ${w.line2}` : ""}, {w.city}, {w.province}</p>
+                )}
                 <p>
                   <span className="text-(--color-text-muted)">Payment:</span>{" "}
-                  {w.method === "ECOCASH" ? "EcoCash" : w.method === "INNBUCKS" ? "InnBucks" : "Cash on Delivery"}
+                  {w.method === "ECOCASH"
+                    ? `EcoCash · ${w.paymentCurrency === "ZWG" ? `${formatZWG(zwgTotal)} (ZiG)` : `${formatUSD(total)} (USD)`}`
+                    : w.method === "INNBUCKS" ? "InnBucks" : isPickup ? "Cash on Collection" : "Cash on Delivery"}
                 </p>
               </div>
               <div className="space-y-1.5 text-sm">
@@ -430,7 +539,7 @@ export function CheckoutForm({
                   </div>
                 ))}
                 <div className="border-t border-(--color-border) pt-2 flex justify-between">
-                  <span>Delivery</span>
+                  <span>{isPickup ? "Collection" : "Delivery"}</span>
                   <span className="price">{deliveryFee === 0 ? "FREE" : formatUSD(deliveryFee)}</span>
                 </div>
                 {appliedCoupon && (
@@ -447,7 +556,17 @@ export function CheckoutForm({
 
               {w.method === "CASH_ON_DELIVERY" && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
-                  💵 You will pay <strong>{formatUSD(total)}</strong> in cash when your order is delivered. Our team will contact you to confirm.
+                  💵 You will pay <strong>{formatUSD(total)}</strong> in cash{" "}
+                  {isPickup
+                    ? `when you collect at ${STORE_PICKUP_LOCATION.name}. We'll let you know once your order is ready.`
+                    : "when your order is delivered. Our team will contact you to confirm."}
+                </div>
+              )}
+
+              {isPickup && w.method !== "CASH_ON_DELIVERY" && (
+                <div className="bg-(--color-surface-alt) border border-(--color-border) rounded-xl p-3 text-sm">
+                  🏬 Collect at <strong>{STORE_PICKUP_LOCATION.name}</strong>, {STORE_PICKUP_LOCATION.line1},{" "}
+                  {STORE_PICKUP_LOCATION.city} · {STORE_PICKUP_LOCATION.hours}. We&apos;ll message you when it&apos;s ready.
                 </div>
               )}
             </div>
@@ -490,10 +609,18 @@ export function CheckoutForm({
       <div className="bg-white border border-(--color-border) rounded-2xl p-5 space-y-4 sticky top-24 shadow-sm">
         <h2 className="font-semibold text-base">Order Summary</h2>
 
-        {initialSubtotal < FREE_THRESHOLD && (
+        {isPickup ? (
+          <div className="flex items-start gap-2 bg-(--color-surface-alt) rounded-xl px-3 py-2.5 text-xs">
+            <Store size={14} className="text-(--color-primary) mt-0.5 shrink-0" />
+            <span>
+              Collecting at <strong>{STORE_PICKUP_LOCATION.name}</strong> — {STORE_PICKUP_LOCATION.line1},{" "}
+              {STORE_PICKUP_LOCATION.city}
+            </span>
+          </div>
+        ) : initialSubtotal < FREE_DELIVERY_THRESHOLD_USD && (
           <div className="bg-(--color-accent-light) rounded-xl px-3 py-2.5 text-xs">
-            Add <strong className="price">{formatUSD(FREE_THRESHOLD - initialSubtotal)}</strong> more for free delivery!
-            <DeliveryProgressBar percent={(initialSubtotal / FREE_THRESHOLD) * 100} />
+            Add <strong className="price">{formatUSD(FREE_DELIVERY_THRESHOLD_USD - initialSubtotal)}</strong> more for free delivery!
+            <DeliveryProgressBar percent={(initialSubtotal / FREE_DELIVERY_THRESHOLD_USD) * 100} />
           </div>
         )}
 
@@ -525,7 +652,7 @@ export function CheckoutForm({
             <span className="price">{formatUSD(initialSubtotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-(--color-text-muted)">Delivery</span>
+            <span className="text-(--color-text-muted)">{isPickup ? "Collection" : "Delivery"}</span>
             <span className={`price ${deliveryFee === 0 ? "text-(--color-success) font-semibold" : ""}`}>
               {deliveryFee === 0 ? "FREE" : formatUSD(deliveryFee)}
             </span>
@@ -548,8 +675,8 @@ export function CheckoutForm({
             <span>Secure checkout</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-(--color-text-muted)">
-            <Truck size={13} className="shrink-0" />
-            <span>Fast delivery across Zimbabwe</span>
+            {isPickup ? <Store size={13} className="shrink-0" /> : <Truck size={13} className="shrink-0" />}
+            <span>{isPickup ? `Free collection at ${STORE_PICKUP_LOCATION.name}` : `Delivery in ${DELIVERY_AREA_LABEL}`}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-(--color-text-muted)">
             <BadgeCheck size={13} className="shrink-0" />
@@ -559,6 +686,59 @@ export function CheckoutForm({
       </div>
     </div>
     </div>
+  );
+}
+
+function FulfillmentOption({ active, onClick, icon, label, desc, note }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode;
+  label: string; desc: string; note: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`text-left rounded-xl border-2 p-4 transition-all h-full ${
+        active
+          ? "border-(--color-primary) bg-(--color-primary-light)"
+          : "border-(--color-border) hover:border-gray-300 bg-white"
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className={active ? "text-(--color-primary)" : "text-(--color-text-muted)"}>{icon}</span>
+        <span className="font-semibold text-sm flex-1">{label}</span>
+        <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? "border-(--color-primary)" : "border-(--color-border)"}`}>
+          {active && <span className="w-2 h-2 rounded-full bg-(--color-primary)" />}
+        </span>
+      </div>
+      <p className="text-xs text-(--color-text-muted) mt-1.5 leading-relaxed">{desc}</p>
+      <p className="text-xs font-semibold text-(--color-success) mt-1.5">{note}</p>
+    </button>
+  );
+}
+
+function CurrencyChoice({ active, onClick, flag, label, amount }: {
+  active: boolean; onClick: () => void; flag: string; label: string; amount: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-all ${
+        active
+          ? "border-(--color-primary) bg-(--color-primary-light)"
+          : "border-(--color-border) hover:border-gray-300 bg-white"
+      }`}
+    >
+      <span className="text-xl leading-none">{flag}</span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-tight">{label}</p>
+        <p className="price text-xs text-(--color-text-muted) leading-tight">{amount}</p>
+      </div>
+      <div className={`ml-auto w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? "border-(--color-primary)" : "border-(--color-border)"}`}>
+        {active && <div className="w-2 h-2 rounded-full bg-(--color-primary)" />}
+      </div>
+    </button>
   );
 }
 

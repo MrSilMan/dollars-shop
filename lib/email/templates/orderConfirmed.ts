@@ -1,11 +1,13 @@
 import type { OrderEmailData } from "../index";
 import { emailWrapper, itemsTable, totalsBlock } from "./base";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
 
 export function orderConfirmedHtml(data: OrderEmailData): string {
+  const isPickup = data.fulfillmentType === "PICKUP";
   const methodLabel: Record<string, string> = {
     ECOCASH: "EcoCash",
     INNBUCKS: "InnBucks",
-    CASH_ON_DELIVERY: "Cash on Delivery",
+    CASH_ON_DELIVERY: isPickup ? "Cash on Collection" : "Cash on Delivery",
   };
   const addr = data.shippingAddress;
 
@@ -13,7 +15,9 @@ export function orderConfirmedHtml(data: OrderEmailData): string {
     <h2 style="margin:0 0 6px;font-size:20px;color:#111;">Hi ${data.customerName},</h2>
     <p style="margin:0 0 24px;font-size:15px;color:#555;">
       Thank you for your order! We've received it and it's currently being processed.
-      ${data.paymentMethod === "CASH_ON_DELIVERY" ? "Our team will contact you to arrange delivery and payment." : ""}
+      ${isPickup
+        ? "We'll let you know as soon as it's packed and ready to collect at our shop."
+        : data.paymentMethod === "CASH_ON_DELIVERY" ? "Our team will contact you to arrange delivery and payment." : ""}
     </p>
 
     <div style="background:#fef2f2;border-left:4px solid #D4251C;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:24px;">
@@ -26,12 +30,21 @@ export function orderConfirmedHtml(data: OrderEmailData): string {
     ${totalsBlock(data.subtotal, data.deliveryFee, data.discount, data.total)}
 
     <div style="margin-top:24px;padding:16px;background:#f9f9f9;border-radius:10px;">
-      <p style="margin:0 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;">Delivery Address</p>
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;">
+        ${isPickup ? "Collection Point" : "Delivery Address"}
+      </p>
       <p style="margin:0;font-size:14px;color:#333;line-height:1.6;">
+        ${isPickup ? `<strong>${STORE_PICKUP_LOCATION.name}</strong><br/>` : ""}
         ${addr.line1}${addr.line2 ? `, ${addr.line2}` : ""}<br/>
         ${addr.city}, ${addr.province}<br/>
         Zimbabwe
       </p>
+      ${isPickup
+        ? `<p style="margin:10px 0 0;font-size:13px;color:#666;line-height:1.6;">
+             Open ${STORE_PICKUP_LOCATION.hours}<br/>
+             Bring your order number <strong>${data.orderNumber}</strong> and an ID when you collect.
+           </p>`
+        : ""}
     </div>
 
     <div style="margin-top:12px;padding:16px;background:#f9f9f9;border-radius:10px;">

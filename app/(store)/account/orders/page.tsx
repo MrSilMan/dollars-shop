@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getMyOrders } from "@/actions/orders";
-import { formatUSD, toNumber } from "@/lib/utils/currency";
+import { formatUSD, formatZWG, toNumber } from "@/lib/utils/currency";
 import Link from "next/link";
 import {
   Package,
@@ -165,6 +165,7 @@ export default async function OrdersPage() {
             {orders.map((order) => {
               const sc = statusConfig[order.status] ?? fallbackConfig;
               const StatusIcon = sc.icon;
+              const zwgPaid = order.transactions?.[0];
               const formattedDate = new Intl.DateTimeFormat("en-ZW", {
                 day: "2-digit",
                 month: "short",
@@ -199,9 +200,16 @@ export default async function OrdersPage() {
                         <StatusIcon size={11} />
                         {sc.label}
                       </span>
-                      <p className="price text-sm font-bold text-(--color-primary)">
-                        {formatUSD(toNumber(order.total))}
-                      </p>
+                      <div className="text-right">
+                        <p className="price text-sm font-bold text-(--color-primary)">
+                          {formatUSD(toNumber(order.total))}
+                        </p>
+                        {zwgPaid && (
+                          <p className="price text-[11px] font-semibold text-teal-600 mt-0.5 whitespace-nowrap">
+                            Paid {formatZWG(toNumber(zwgPaid.amount))} · ZiG
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 

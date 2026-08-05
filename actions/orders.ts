@@ -15,7 +15,16 @@ export async function getMyOrders() {
   if (!session?.user?.id) return [];
   return prisma.order.findMany({
     where: { userId: session.user.id },
-    include: { items: true },
+    include: {
+      items: true,
+      // Non-USD settlements (e.g. ZiG) so the UI can show what was actually paid
+      transactions: {
+        where: { provider: "ECOCASH", currency: { not: "USD" }, status: { in: ["COMPLETED", "REFUNDED"] } },
+        select: { currency: true, amount: true, exchangeRate: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

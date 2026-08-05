@@ -6,7 +6,8 @@ import { clearCart } from "@/actions/cart";
 import { getFeaturedProducts } from "@/actions/products";
 import { getBlurMapForProducts } from "@/lib/images";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
-import { CheckCircle2, MessageCircle, Package, Truck, ClipboardList, MapPin } from "lucide-react";
+import { CheckCircle2, MessageCircle, Package, Truck, ClipboardList, MapPin, Store, Clock } from "lucide-react";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
 import { ConfettiEffect } from "./_components/ConfettiEffect";
 import { DownloadReceiptButton } from "./_components/DownloadReceiptButton";
 
@@ -23,19 +24,25 @@ interface ShippingAddress {
   country: string;
 }
 
-function formatPaymentMethod(method: string) {
+function formatPaymentMethod(method: string, isPickup: boolean) {
   const labels: Record<string, string> = {
-    CASH_ON_DELIVERY: "Cash on Delivery",
+    CASH_ON_DELIVERY: isPickup ? "Cash on Collection" : "Cash on Delivery",
     ECOCASH: "EcoCash",
     INNBUCKS: "InnBucks",
   };
   return labels[method] ?? method;
 }
 
-const NEXT_STEPS = [
+const DELIVERY_STEPS = [
   { icon: ClipboardList, label: "Order Received",  desc: "We have your order and are getting it ready." },
   { icon: Package,       label: "Being Packed",     desc: "Your items are carefully packed for shipping." },
   { icon: Truck,         label: "Out for Delivery", desc: "On its way to you in 2–4 business days." },
+];
+
+const PICKUP_STEPS = [
+  { icon: ClipboardList, label: "Order Received", desc: "We have your order and are getting it ready." },
+  { icon: Package,       label: "Being Packed",   desc: "Your items are set aside and packed for you." },
+  { icon: Store,         label: "Ready to Collect", desc: "We'll message you as soon as it's waiting in store." },
 ];
 
 interface Props { searchParams: Promise<{ order?: string }> }
@@ -49,6 +56,8 @@ export default async function SuccessPage({ searchParams }: Props) {
   ]);
 
   const address = order?.shippingAddress as ShippingAddress | undefined;
+  const isPickup = order?.fulfillmentType === "PICKUP";
+  const nextSteps = isPickup ? PICKUP_STEPS : DELIVERY_STEPS;
   const purchasedIds = new Set(order?.items.map((i) => i.productId) ?? []);
   const recommendations = featuredProducts.filter((p) => !purchasedIds.has(p.id)).slice(0, 4);
   const blurMap = await getBlurMapForProducts(recommendations);
@@ -79,11 +88,15 @@ export default async function SuccessPage({ searchParams }: Props) {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-(--color-text-muted)">Payment</span>
-              <span className="text-sm font-medium">{formatPaymentMethod(order.paymentMethod)}</span>
+              <span className="text-sm font-medium">{formatPaymentMethod(order.paymentMethod, isPickup)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-(--color-text-muted)">Estimated delivery</span>
-              <span className="text-sm font-semibold text-(--color-primary)">2–4 business days</span>
+              <span className="text-sm text-(--color-text-muted)">
+                {isPickup ? "Ready to collect" : "Estimated delivery"}
+              </span>
+              <span className="text-sm font-semibold text-(--color-primary)">
+                {isPickup ? "Within 24 hours" : "2–4 business days"}
+              </span>
             </div>
 
             {/* Items */}
@@ -98,7 +111,7 @@ export default async function SuccessPage({ searchParams }: Props) {
               ))}
               {toNumber(order.deliveryFee) > 0 && (
                 <div className="flex justify-between text-sm text-(--color-text-muted)">
-                  <span>Delivery fee</span>
+                  <span>{isPickup ? "Collection fee" : "Delivery fee"}</span>
                   <span className="price">{formatUSD(toNumber(order.deliveryFee))}</span>
                 </div>
               )}
@@ -114,8 +127,31 @@ export default async function SuccessPage({ searchParams }: Props) {
               </div>
             </div>
 
-            {/* Shipping address */}
-            {address && (
+            {/* Collection point / shipping address */}
+            {isPickup ? (
+              <div className="border-t border-(--color-border) pt-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">
+                  Collection point
+                </p>
+                <div className="flex items-start gap-2">
+                  <MapPin size={15} className="text-(--color-text-muted) mt-0.5 shrink-0" />
+                  <div className="text-sm leading-relaxed">
+                    <p className="font-medium">{STORE_PICKUP_LOCATION.name}</p>
+                    <p className="text-(--color-text-muted)">{STORE_PICKUP_LOCATION.line1}</p>
+                    <p className="text-(--color-text-muted)">
+                      {STORE_PICKUP_LOCATION.city}, {STORE_PICKUP_LOCATION.country}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-(--color-text-muted)">
+                  <Clock size={15} className="shrink-0" />
+                  <span>{STORE_PICKUP_LOCATION.hours}</span>
+                </div>
+                <p className="text-xs text-(--color-text-muted)">
+                  Bring order <strong>{order.orderNumber}</strong> and an ID when you collect.
+                </p>
+              </div>
+            ) : address && (
               <div className="border-t border-(--color-border) pt-3">
                 <div className="flex items-start gap-2">
                   <MapPin size={15} className="text-(--color-text-muted) mt-0.5 shrink-0" />
@@ -141,7 +177,7 @@ export default async function SuccessPage({ searchParams }: Props) {
             What happens next?
           </h2>
           <div className="grid grid-cols-3 gap-3">
-            {NEXT_STEPS.map(({ icon: Icon, label, desc }, i) => (
+            {nextSteps.map(({ icon: Icon, label, desc }, i) => (
               <div
                 key={i}
                 className="bg-(--color-surface) border border-(--color-border) rounded-xl p-3 text-center space-y-2"

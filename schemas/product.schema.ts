@@ -10,6 +10,7 @@ export const ProductSchema = z.object({
   stock: z.number().int().min(0),
   lowStockAlert: z.number().int().min(0).default(10),
   categoryId: z.string().cuid(),
+  additionalCategoryIds: z.array(z.string().cuid()).default([]),
   featured: z.boolean().default(false),
   isActive: z.boolean().default(true),
   tags: z.array(z.string()).default([]),

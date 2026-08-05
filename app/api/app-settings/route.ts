@@ -22,8 +22,15 @@ const UpdateSchema = z.object({
   faviconUrl: z.string().nullable().optional(),
   appName: z.string().min(1).max(80).optional(),
   footerText: z.string().max(300).optional(),
+  contactAddress: z.string().max(200).optional(),
+  contactPhone: z.string().max(40).optional(),
+  contactEmail: z.union([z.string().email(), z.literal("")]).optional(),
+  contactHours: z.string().max(200).optional(),
+  facebookUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  instagramUrl: z.union([z.string().url(), z.literal("")]).optional(),
   fontScale: z.enum(["SMALL", "MEDIUM", "LARGE"]).optional(),
   whatsappAdminNumbers: z.array(z.string().max(20)).max(10).optional(),
+  zwgRate: z.coerce.number().positive("Rate must be greater than 0").max(100000).optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -36,7 +43,12 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   const parsed = UpdateSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json({ error: "Invalid input" }, { status: 400 });
+    const issue = parsed.error.issues[0];
+    const field = issue?.path.join(".");
+    return Response.json(
+      { error: field ? `Invalid input: ${field} — ${issue.message}` : "Invalid input" },
+      { status: 400 },
+    );
   }
 
   const settings = await prisma.appSettings.upsert({

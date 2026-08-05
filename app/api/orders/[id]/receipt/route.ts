@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     orderNumber: order.orderNumber,
     createdAt: order.createdAt,
     paymentMethod: order.paymentMethod,
+    fulfillmentType: order.fulfillmentType,
     customerName: address.name,
     customerPhone: address.phone,
     items: order.items.map((item) => ({

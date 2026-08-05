@@ -8,6 +8,7 @@ import { sendWhatsAppStatusUpdate } from "@/lib/notifications/whatsapp";
 import { logger } from "@/lib/logger";
 import { canAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { refundEcoCashTransaction } from "@/lib/payments/ecocash";
 
 const VALID_STATUSES = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"] as const;
 type OrderStatus = typeof VALID_STATUSES[number];
@@ -63,6 +64,66 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
 
   logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: role, action: "ORDER_STATUS_UPDATE", entity: "order", entityId: orderId, entityLabel: order.orderNumber, detail: { newStatus, previousStatus: order.status } });
   logger.info("Order status updated", { orderId, newStatus });
+  return { success: true };
+}
+
+export async function refundEcoCashOrder(orderId: string) {
+  const session = await auth();
+  const actor = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  const role = actor?.role;
+  if (!canAccess("orders", role ?? "")) return { error: "Unauthorized" };
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { transactions: true },
+  });
+  if (!order) return { error: "Order not found" };
+  if (order.paymentMethod !== "ECOCASH") return { error: "Not an EcoCash order" };
+  if (order.paymentStatus === "REFUNDED") return { error: "Order has already been refunded" };
+  if (order.paymentStatus !== "PAID") return { error: "Only paid orders can be refunded" };
+
+  const paidTxn = order.transactions.find(t => t.status === "COMPLETED" && t.providerRef);
+  if (!paidTxn) return { error: "No completed EcoCash transaction with a reference on file" };
+
+  const refundCorrelator = `${order.orderNumber}-REF-${Date.now()}`;
+  const result = await refundEcoCashTransaction({
+    clientCorrelator: refundCorrelator,
+    msisdn: paidTxn.msisdn,
+    amount: Number(paidTxn.amount),
+    currency: paidTxn.currency === "ZWG" ? "ZWG" : "USD",
+    originalEcocashReference: paidTxn.providerRef!,
+    referenceCode: order.orderNumber,
+    description: `Refund of order ${order.orderNumber}`,
+  });
+
+  if (result.status !== "COMPLETED") return { error: result.error };
+
+  await prisma.$transaction([
+    prisma.paymentTransaction.create({
+      data: {
+        orderId: order.id,
+        provider: "ECOCASH",
+        clientCorrelator: refundCorrelator,
+        msisdn: paidTxn.msisdn,
+        amount: paidTxn.amount,
+        currency: paidTxn.currency,
+        status: "REFUNDED",
+        providerRef: result.ecocashReference,
+      },
+    }),
+    prisma.paymentTransaction.update({
+      where: { id: paidTxn.id },
+      data: { status: "REFUNDED" },
+    }),
+    prisma.order.update({
+      where: { id: order.id },
+      data: { paymentStatus: "REFUNDED", status: "REFUNDED" },
+    }),
+  ]);
+
+  revalidatePath("/admin/orders");
+  logAudit({ actorId: actor?.id, actorEmail: actor?.email, actorRole: role, action: "ORDER_ECOCASH_REFUND", entity: "order", entityId: orderId, entityLabel: order.orderNumber, detail: { amount: Number(paidTxn.amount), ecocashReference: result.ecocashReference } });
+  logger.info("EcoCash refund completed", { orderId, refundCorrelator });
   return { success: true };
 }
 

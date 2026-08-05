@@ -1,4 +1,6 @@
 import { ShieldCheck, Truck, MessageCircle } from "lucide-react";
+import { FREE_DELIVERY_THRESHOLD_USD } from "@/lib/delivery";
+import { paymentMethodsSummary } from "@/lib/payments/providers";
 
 export function TrustBadges() {
   return (
@@ -8,7 +10,7 @@ export function TrustBadges() {
           <ShieldCheck size={22} />
         </div>
         <p className="font-semibold text-sm text-(--color-text-primary)">Secure Checkout</p>
-        <p className="text-xs text-(--color-text-muted)">EcoCash &amp; InnBucks</p>
+        <p className="text-xs text-(--color-text-muted)">{paymentMethodsSummary()}</p>
       </div>
 
       <div className="flex flex-col items-center gap-2 py-6 px-4 text-center">
@@ -16,7 +18,7 @@ export function TrustBadges() {
           <Truck size={22} />
         </div>
         <p className="font-semibold text-sm text-(--color-text-primary)">Fast Delivery</p>
-        <p className="text-xs text-(--color-text-muted)">Free over $15</p>
+        <p className="text-xs text-(--color-text-muted)">Free over ${FREE_DELIVERY_THRESHOLD_USD}</p>
       </div>
 
       <div className="flex flex-col items-center gap-2 py-6 px-4 text-center">

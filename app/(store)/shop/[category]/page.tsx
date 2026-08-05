@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ShoppingBasket } from "lucide-react";
 import { ProductGrid } from "@/components/store/ProductGrid";
 import { CategoryNav } from "@/components/store/CategoryNav";
 import { ShopPagination } from "@/components/store/ShopPagination";
 import { TrustBadges } from "@/components/store/TrustBadges";
 import { getProductsByCategory, getAllCategories } from "@/actions/products";
 import { getBlurMapForProducts } from "@/lib/images";
-import { categoryIconMap } from "@/lib/categories";
+import { CategoryImage } from "@/components/store/CategoryImage";
 
 interface Props {
   params: Promise<{ category: string }>;
@@ -38,7 +37,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   if (!result.category) notFound();
 
-  const CategoryIcon = categoryIconMap[result.category.slug] ?? ShoppingBasket;
   const totalPages = Math.ceil(result.total / PAGE_SIZE);
   const blurMap = await getBlurMapForProducts(result.products);
 
@@ -46,7 +44,14 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <CategoryIcon size={24} aria-hidden="true" className="text-(--color-primary)" />
+          <CategoryImage
+            slug={result.category.slug}
+            name={result.category.name}
+            image={categories.find((c) => c.slug === category)?.image}
+            size={32}
+            iconSize={24}
+            className="w-8 h-8 rounded-lg text-(--color-primary)"
+          />
           <h1 className="font-display text-2xl font-bold">{result.category.name}</h1>
         </div>
         {result.category.description && (

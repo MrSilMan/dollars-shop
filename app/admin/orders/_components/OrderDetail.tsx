@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { updateOrderStatus, markCODPaymentReceived } from "@/actions/admin/orders";
-import { formatUSD } from "@/lib/utils/currency";
-import { X, Loader2, Package, BanknoteIcon } from "lucide-react";
+import { updateOrderStatus, markCODPaymentReceived, refundEcoCashOrder } from "@/actions/admin/orders";
+import { formatUSD, formatZWG } from "@/lib/utils/currency";
+import { X, Loader2, Package, BanknoteIcon, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface OrderItem {
@@ -27,11 +27,13 @@ interface Order {
   deliveryFee: number | { toNumber: () => number };
   discount: number | { toNumber: () => number };
   couponCode?: string | null;
+  fulfillmentType?: string;
   shippingAddress: Record<string, string>;
   createdAt: Date;
   items: OrderItem[];
   user?: { name?: string | null; email: string } | null;
   guestEmail?: string | null;
+  payment?: { currency: string; amount: number; exchangeRate: number | null } | null;
 }
 
 const STATUSES = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"] as const;
@@ -85,7 +87,24 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
     router.refresh();
   };
 
+  const [refundLoading, setRefundLoading] = useState(false);
+
+  const handleRefund = async () => {
+    if (!window.confirm(`Refund ${formatUSD(n(order.total))} to the customer's EcoCash wallet? This cannot be undone.`)) return;
+    setRefundLoading(true);
+    setError(null);
+    setSuccess(null);
+    const result = await refundEcoCashOrder(order.id);
+    setRefundLoading(false);
+    if ("error" in result) { setError(result.error ?? null); return; }
+    setPaymentStatus("REFUNDED");
+    setStatus("REFUNDED");
+    setSuccess("Refund sent to the customer's EcoCash wallet.");
+    router.refresh();
+  };
+
   const addr = order.shippingAddress ?? {};
+  const isPickup = order.fulfillmentType === "PICKUP";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30 backdrop-blur-sm" onClick={onClose}>
@@ -135,7 +154,9 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-amber-800">Cash not yet collected</p>
-                <p className="text-xs text-amber-600 mt-0.5">Confirm once driver hands over the cash.</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  {isPickup ? "Confirm once the customer pays at the counter." : "Confirm once driver hands over the cash."}
+                </p>
               </div>
               <button
                 type="button"
@@ -145,6 +166,25 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
               >
                 {payLoading ? <Loader2 size={12} className="animate-spin" /> : <BanknoteIcon size={12} />}
                 Mark as Paid
+              </button>
+            </div>
+          )}
+
+          {/* EcoCash refund */}
+          {order.paymentMethod === "ECOCASH" && paymentStatus === "PAID" && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-800">Paid via EcoCash</p>
+                <p className="text-xs text-red-600 mt-0.5">Reverse the payment back to the customer&apos;s wallet.</p>
+              </div>
+              <button
+                type="button"
+                disabled={refundLoading}
+                onClick={handleRefund}
+                className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {refundLoading ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                Refund {formatUSD(n(order.total))}
               </button>
             </div>
           )}
@@ -160,6 +200,9 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 capitalize">
               {order.paymentMethod.replace(/_/g, " ").toLowerCase()}
             </span>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isPickup ? "bg-violet-50 text-violet-700" : "bg-sky-50 text-sky-700"}`}>
+              {isPickup ? "Collect in store" : "Delivery"}
+            </span>
           </div>
 
           {/* Customer */}
@@ -170,13 +213,21 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
             {addr.phone && <p className="text-sm text-(--color-text-muted)">{addr.phone}</p>}
           </div>
 
-          {/* Shipping address */}
+          {/* Shipping address / collection point */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-(--color-text-muted) mb-2">Delivery Address</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-(--color-text-muted) mb-2">
+              {isPickup ? "Collection Point" : "Delivery Address"}
+            </p>
             <p className="text-sm leading-relaxed">
               {addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}<br />
               {addr.city}, {addr.province}, Zimbabwe
             </p>
+            {isPickup && (
+              <p className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 mt-2">
+                Customer collects in store — nothing to dispatch. Mark as <strong>SHIPPED</strong> once it&apos;s packed
+                and waiting at the counter, then <strong>DELIVERED</strong> when they pick it up.
+              </p>
+            )}
           </div>
 
           {/* Items */}
@@ -205,7 +256,7 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
               <span>Subtotal</span><span>{formatUSD(n(order.subtotal))}</span>
             </div>
             <div className="flex justify-between text-(--color-text-muted)">
-              <span>Delivery</span><span>{n(order.deliveryFee) === 0 ? "FREE" : formatUSD(n(order.deliveryFee))}</span>
+              <span>{isPickup ? "Collection" : "Delivery"}</span><span>{n(order.deliveryFee) === 0 ? "FREE" : formatUSD(n(order.deliveryFee))}</span>
             </div>
             {n(order.discount) > 0 && (
               <div className="flex justify-between text-emerald-600">
@@ -217,6 +268,17 @@ export function OrderDetail({ order, onClose }: { order: Order; onClose: () => v
               <span>Total</span>
               <span className="text-(--color-primary)">{formatUSD(n(order.total))}</span>
             </div>
+            {order.payment?.currency === "ZWG" && (
+              <div className="flex justify-between items-center border-t border-(--color-border) pt-2 mt-1 text-teal-700">
+                <span className="font-medium">
+                  Paid in ZiG
+                  {order.payment.exchangeRate ? (
+                    <span className="text-xs text-(--color-text-muted) font-normal"> · US$1 = {order.payment.exchangeRate} ZiG</span>
+                  ) : null}
+                </span>
+                <span className="price font-bold">{formatZWG(order.payment.amount)}</span>
+              </div>
+            )}
           </div>
 
           <p className="text-xs text-(--color-text-muted)">

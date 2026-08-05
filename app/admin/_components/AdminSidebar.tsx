@@ -3,13 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X, UserCog, ClipboardList, Mail, UserCircle } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Store, ChevronRight, Layers, Tag, X, UserCog, ClipboardList, Mail, UserCircle, Shapes } from "lucide-react";
 import { signOutAction } from "@/actions/auth";
 import { canAccess, ROLE_LABELS } from "@/lib/permissions";
 
 const navItems = [
   { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, section: "dashboard"  as const },
   { href: "/admin/products", label: "Products",  icon: Package,         section: "products"   as const },
+  { href: "/admin/categories",label: "Categories",icon: Shapes,         section: "products"   as const },
   { href: "/admin/orders",   label: "Orders",    icon: ShoppingBag,     section: "orders"     as const },
   { href: "/admin/customers",label: "Customers", icon: Users,           section: "customers"  as const },
   { href: "/admin/coupons",  label: "Coupons",   icon: Tag,             section: "coupons"    as const },

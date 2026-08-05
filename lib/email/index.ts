@@ -41,6 +41,7 @@ export interface OrderEmailData {
   discount: number;
   total: number;
   paymentMethod: string;
+  fulfillmentType?: "DELIVERY" | "PICKUP";
   shippingAddress: { line1: string; line2?: string | null; city: string; province: string };
   receiptPdf?: Buffer;
 }

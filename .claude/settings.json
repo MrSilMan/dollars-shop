@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(pm2 list *)",
+      "Bash(npm run *)",
+      "Bash(pm2 restart *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:3000/api/payment/status/ecocash/nonexistent-correlator)",
+      "Bash(pm2 logs *)",
+      "Bash(npx tsx *)",
+      "Bash(node --env-file=.env /tmp/claude-1000/-var-www-dollars-shop/96aac74c-f121-4c76-8ddc-1fb68f47a332/scratchpad/negative-tests.mjs)",
+      "Bash(node --env-file=.env /tmp/claude-1000/-var-www-dollars-shop/96aac74c-f121-4c76-8ddc-1fb68f47a332/scratchpad/negative-followup.mjs)",
+      "Bash(curl -s -o /dev/null -w \"homepage: HTTP %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(dig +short dollarshop.co.zw A)",
+      "Bash(dig +short www.dollarshop.co.zw)",
+      "Bash(dig www.dollarshop.co.zw +noall +answer +authority)",
+      "Bash(dig +short dollarshop.co.zw NS)",
+      "Bash(curl -s -4 ifconfig.me)",
+      "Read(//etc/nginx/sites-enabled/**)",
+      "Read(//etc/letsencrypt/live/**)",
+      "Bash(ss -tlnp 2>/dev/null | grep -E ':\\(80|443\\) ' | head; echo \"---\"; ls /etc/nginx 2>&1 | head; echo \"--- caddy?\"; ls /etc/caddy 2>&1 | head; echo \"--- docker\"; docker ps --format '{{.Names}}\\\\t{{.Ports}}' 2>&1 | head)",
+      "Read(//etc/nginx/**)",
+      "Read(//etc/**)",
+      "Read(//etc/nginx/conf.d/**)",
+      "Bash(sudo -n ls /etc/letsencrypt/live/)",
+      "Read(//etc/letsencrypt/**)",
+      "Read(//etc/nginx/sites-available/**)",
+      "Bash(curl -sI -o /dev/null -w \"%{http_code}\\\\n\" https://dollarshop.co.zw --max-time 10)",
+      "Bash(curl -sI -o /dev/null -w \"%{http_code}\\\\n\" https://www.dollarshop.co.zw --resolve www.dollarshop.co.zw:443:76.13.9.158 --max-time 10)",
+      "Bash(curl -skI -o /dev/null -w \"http=%{http_code} sslverify_skipped\\\\n\" https://www.dollarshop.co.zw --resolve www.dollarshop.co.zw:443:76.13.9.158 --max-time 10)",
+      "Bash(openssl s_client -connect 76.13.9.158:443 -servername www.dollarshop.co.zw)",
+      "Bash(openssl x509 *)",
+      "Bash(curl -s -o /dev/null -w \"admin: HTTP %{http_code}\\\\n\" http://localhost:3000/admin)",
+      "Bash(npx next *)",
+      "Bash(curl -s -o /dev/null -w \"local:%{http_code} \" http://127.0.0.1:3000/)",
+      "Bash(curl -s -o /dev/null -w \"admin:%{http_code} \" http://127.0.0.1:3000/admin)",
+      "Bash(curl -s -o /dev/null -w \"site:%{http_code}\\\\n\" https://dollarshop.co.zw/)"
+    ]
+  }
+}

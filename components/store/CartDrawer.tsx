@@ -5,6 +5,7 @@ import Link from "next/link";
 import { X, ShoppingCart, Minus, Plus, Trash2 } from "lucide-react";
 import { formatUSD, toNumber } from "@/lib/utils/currency";
 import { useCart } from "@/hooks/useCart";
+import { calculateDeliveryFee, FREE_DELIVERY_THRESHOLD_USD } from "@/lib/delivery";
 
 interface CartItem {
   id: string;
@@ -25,13 +26,11 @@ interface CartDrawerProps {
   onClose: () => void;
 }
 
-const FREE_THRESHOLD = 15;
-
 export function CartDrawer({ items, open, onClose }: CartDrawerProps) {
   const { update, remove, isPending } = useCart();
   const subtotal = items.reduce((s, i) => s + toNumber(i.product.price) * i.quantity, 0);
-  const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : 3;
-  const remaining = FREE_THRESHOLD - subtotal;
+  const deliveryFee = calculateDeliveryFee(subtotal);
+  const remaining = FREE_DELIVERY_THRESHOLD_USD - subtotal;
 
   return (
     <>
@@ -81,7 +80,7 @@ export function CartDrawer({ items, open, onClose }: CartDrawerProps) {
                 <div className="h-1.5 bg-(--color-border) rounded-full mt-1.5 overflow-hidden">
                   <div
                     className="h-full bg-(--color-primary) rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min((subtotal / FREE_THRESHOLD) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((subtotal / FREE_DELIVERY_THRESHOLD_USD) * 100, 100)}%` }}
                   />
                 </div>
               </div>

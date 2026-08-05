@@ -10,17 +10,15 @@ import { ShieldCheck, RotateCcw, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/ProductCard";
 import { DeliveryProgressBar } from "./_components/DeliveryProgressBar";
 import { getBlurMapForProducts } from "@/lib/images";
+import { calculateDeliveryFee, FREE_DELIVERY_THRESHOLD_USD, DELIVERY_AREA_LABEL } from "@/lib/delivery";
 
 export const metadata: Metadata = { title: "Shopping Cart" };
-
-const FREE_THRESHOLD = 15;
-const DELIVERY_FEE = 3;
 
 export default async function CartPage() {
   const [items, session] = await Promise.all([getCartItems(), auth()]);
   const subtotal = items.reduce((s, i) => s + toNumber(i.product.price) * i.quantity, 0);
-  const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
-  const remaining = FREE_THRESHOLD - subtotal;
+  const deliveryFee = calculateDeliveryFee(subtotal);
+  const remaining = FREE_DELIVERY_THRESHOLD_USD - subtotal;
 
   const cartProductIds = items.map((i) => i.productId);
   const categoryIds = [...new Set(items.map((i) => i.product.categoryId))];
@@ -64,8 +62,8 @@ export default async function CartPage() {
 
       {remaining > 0 && (
         <div className="bg-(--color-accent-light) rounded-xl px-4 py-3 mb-6 text-sm">
-          Add <strong className="price">{formatUSD(remaining)}</strong> more for free delivery!
-          <DeliveryProgressBar percent={Math.min((subtotal / FREE_THRESHOLD) * 100, 100)} />
+          Add <strong className="price">{formatUSD(remaining)}</strong> more for free delivery in {DELIVERY_AREA_LABEL}!
+          <DeliveryProgressBar percent={Math.min((subtotal / FREE_DELIVERY_THRESHOLD_USD) * 100, 100)} />
         </div>
       )}
 

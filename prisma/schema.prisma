@@ -68,8 +68,18 @@ model AppSettings {
   faviconUrl   String?
   appName      String    @default("Dollar Shop")
   footerText   String    @default("© 2025 Dollar Shop — Quality Everyday. Every Dollar Counts.")
+  // Footer "Contact" column — address, phone, email and opening hours
+  contactAddress String  @default("123 Samora Machel Ave, Harare, Zimbabwe")
+  contactPhone   String  @default("+263 77 256 6468")
+  contactEmail   String  @default("hello@dollarshop.co.zw")
+  contactHours   String  @default("Mon–Sat: 8AM–6PM\nSun: 9AM–1PM")
+  // Footer social links — blank hides the icon
+  facebookUrl    String  @default("https://facebook.com/dollarshopzw")
+  instagramUrl   String  @default("https://instagram.com/dollarshopzw")
   fontScale             FontScale @default(MEDIUM)
   whatsappAdminNumbers  String[]  @default([])
+  // How many ZWG (ZiG) one US dollar buys, for EcoCash pay-in-ZWG at checkout
+  zwgRate               Decimal   @default(39) @db.Decimal(12, 4)
   updatedAt             DateTime  @updatedAt
 
   @@map("app_settings")
@@ -102,6 +112,7 @@ model Category {
   parent      Category?  @relation("Subcategory", fields: [parentId], references: [id])
   children    Category[] @relation("Subcategory")
   products    Product[]
+  extraProducts Product[] @relation("ProductExtraCategories")
   sortOrder   Int        @default(0)
   isActive    Boolean    @default(true)
 
@@ -122,6 +133,7 @@ model Product {
   tags           String[]
   categoryId     String
   category       Category @relation(fields: [categoryId], references: [id])
+  additionalCategories Category[] @relation("ProductExtraCategories")
   featured       Boolean  @default(false)
   isActive       Boolean  @default(true)
   weight         Decimal? @db.Decimal(8, 2)
@@ -176,6 +188,9 @@ model Order {
   paymentStatus   PaymentStatus @default(UNPAID)
   paymentMethod   PaymentMethod
   paymentRef      String?
+  // DELIVERY: shippingAddress is the customer's address. PICKUP: the customer
+  // collects in store, and shippingAddress holds the store's address instead.
+  fulfillmentType FulfillmentType @default(DELIVERY)
   subtotal        Decimal       @db.Decimal(10, 2)
   deliveryFee     Decimal       @db.Decimal(10, 2)
   discount        Decimal       @default(0) @db.Decimal(10, 2)
@@ -187,10 +202,44 @@ model Order {
   couponCode      String?
   coupon          Coupon?       @relation(fields: [couponId], references: [id])
   items           OrderItem[]
+  transactions    PaymentTransaction[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   @@map("orders")
+}
+
+// One row per charge attempt against a payment provider. clientCorrelator is the
+// provider-side idempotency key (EcoCash rejects duplicates), so retries after a
+// failed attempt must create a new row rather than reuse one.
+model PaymentTransaction {
+  id               String            @id @default(cuid())
+  orderId          String
+  order            Order             @relation(fields: [orderId], references: [id])
+  provider         PaymentMethod
+  clientCorrelator String            @unique
+  msisdn           String
+  amount           Decimal           @db.Decimal(10, 2)
+  currency         String            @default("USD")
+  // USD→currency rate used at charge time (null for USD charges). Kept so
+  // refunds and reconciliation reproduce the exact amount that was charged.
+  exchangeRate     Decimal?          @db.Decimal(12, 4)
+  status           TransactionStatus @default(PENDING)
+  // EcoCash serverReferenceCode/ecocashReference — required to issue a refund
+  providerRef      String?
+  failureReason    String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([orderId])
+  @@map("payment_transactions")
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
 }
 
 enum OrderStatus {
@@ -215,6 +264,11 @@ enum PaymentMethod {
   ECOCASH
   INNBUCKS
   CASH_ON_DELIVERY
+}
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
 }
 
 model OrderItem {

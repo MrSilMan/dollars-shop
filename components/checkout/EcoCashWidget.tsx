@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { formatUSD } from "@/lib/utils/currency";
+import { formatUSD, formatMoney } from "@/lib/utils/currency";
 import { Loader2, CheckCircle, XCircle, MessageCircle } from "lucide-react";
 
 async function pollEcoCashStatus(transactionId: string) {
@@ -14,6 +14,8 @@ interface EcoCashWidgetProps {
   orderId: string;
   transactionId: string;
   amount: number;
+  currency: "USD" | "ZWG";
+  usdAmount: number;
   customerPhone: string;
   onSuccess: () => void;
   onFailed: () => void;
@@ -21,7 +23,7 @@ interface EcoCashWidgetProps {
 
 type Status = "waiting" | "polling" | "paid" | "failed" | "timeout";
 
-export function EcoCashWidget({ orderId, transactionId, amount, customerPhone, onSuccess, onFailed }: EcoCashWidgetProps) {
+export function EcoCashWidget({ orderId, transactionId, amount, currency, usdAmount, customerPhone, onSuccess, onFailed }: EcoCashWidgetProps) {
   const [status, setStatus] = useState<Status>("polling");
   const [seconds, setSeconds] = useState(180);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -73,8 +75,11 @@ export function EcoCashWidget({ orderId, transactionId, amount, customerPhone, o
           <div>
             <p className="font-semibold text-lg">Check Your Phone</p>
             <p className="text-(--color-text-muted) text-sm mt-1">
-              A payment request of <span className="price font-bold text-(--color-primary)">{formatUSD(amount)}</span> was sent to <strong>{customerPhone}</strong>
+              A payment request of <span className="price font-bold text-(--color-primary)">{formatMoney(amount, currency)}</span> was sent to <strong>{customerPhone}</strong>
             </p>
+            {currency === "ZWG" && (
+              <p className="text-(--color-text-muted) text-xs mt-1">≈ {formatUSD(usdAmount)} · charged in ZiG</p>
+            )}
           </div>
           <div className="flex items-center justify-center gap-2 text-(--color-text-muted) text-sm">
             <Loader2 size={16} className="animate-spin text-(--color-primary)" />

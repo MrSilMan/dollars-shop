@@ -11,8 +11,15 @@ export type AppSettingsData = {
   faviconUrl: string | null;
   appName: string;
   footerText: string;
+  contactAddress: string;
+  contactPhone: string;
+  contactEmail: string;
+  contactHours: string;
+  facebookUrl: string;
+  instagramUrl: string;
   fontScale: "SMALL" | "MEDIUM" | "LARGE";
   whatsappAdminNumbers: string[];
+  zwgRate: number;
   updatedAt: Date;
 };
 
@@ -26,8 +33,15 @@ export const DEFAULT_SETTINGS: AppSettingsData = {
   faviconUrl: null,
   appName: "Dollar Shop",
   footerText: "© 2025 Dollar Shop — Quality Everyday. Every Dollar Counts.",
+  contactAddress: "123 Samora Machel Ave, Harare, Zimbabwe",
+  contactPhone: "+263 77 256 6468",
+  contactEmail: "hello@dollarshop.co.zw",
+  contactHours: "Mon–Sat: 8AM–6PM\nSun: 9AM–1PM",
+  facebookUrl: "https://facebook.com/dollarshopzw",
+  instagramUrl: "https://instagram.com/dollarshopzw",
   fontScale: "MEDIUM",
   whatsappAdminNumbers: [],
+  zwgRate: 39,
   updatedAt: new Date(0),
 };
 
@@ -36,7 +50,11 @@ export async function getAppSettings(): Promise<AppSettingsData> {
   try {
     const s = await prisma.appSettings.findFirst();
     if (!s) return DEFAULT_SETTINGS;
-    return { ...s, fontScale: s.fontScale as AppSettingsData["fontScale"] };
+    return {
+      ...s,
+      fontScale: s.fontScale as AppSettingsData["fontScale"],
+      zwgRate: Number(s.zwgRate),
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }

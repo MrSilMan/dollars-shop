@@ -42,6 +42,7 @@ export interface ReceiptData {
   orderNumber: string;
   createdAt: Date;
   paymentMethod: string;
+  fulfillmentType?: "DELIVERY" | "PICKUP";
   customerName: string;
   customerPhone?: string | null;
   items: ReceiptItem[];
@@ -110,6 +111,7 @@ function createStyles(primaryColor: string, accentColor: string) {
 
 function ReceiptDocument({ data }: { data: ReceiptData }) {
   const addr = data.shippingAddress;
+  const isPickup = data.fulfillmentType === "PICKUP";
   const styles = createStyles(data.primaryColor, data.accentColor);
   return (
     <Document>
@@ -137,13 +139,15 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
 
         <View style={styles.metaRow}>
           <View style={styles.metaBlock}>
-            <Text style={styles.label}>Billed To</Text>
-            <Text style={styles.nameValue}>{data.customerName}</Text>
+            <Text style={styles.label}>{isPickup ? "Collect At" : "Billed To"}</Text>
+            <Text style={styles.nameValue}>{isPickup ? data.appName : data.customerName}</Text>
             <Text style={styles.value}>
               {addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}
             </Text>
             <Text style={styles.value}>{addr.city}, {addr.province}, {addr.country}</Text>
-            {data.customerPhone && <Text style={styles.value}>{data.customerPhone}</Text>}
+            {isPickup
+              ? <Text style={styles.value}>For: {data.customerName}{data.customerPhone ? ` · ${data.customerPhone}` : ""}</Text>
+              : data.customerPhone && <Text style={styles.value}>{data.customerPhone}</Text>}
           </View>
           <View style={[styles.metaBlock, { alignItems: "flex-end" }]}>
             <Text style={styles.label}>Order Date</Text>
@@ -151,7 +155,13 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
               {data.createdAt.toLocaleDateString("en-ZW", { year: "numeric", month: "long", day: "numeric" })}
             </Text>
             <Text style={styles.label}>Payment Method</Text>
-            <Text style={styles.value}>{PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</Text>
+            <Text style={[styles.value, { marginBottom: 10 }]}>
+              {isPickup && data.paymentMethod === "CASH_ON_DELIVERY"
+                ? "Cash on Collection"
+                : PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}
+            </Text>
+            <Text style={styles.label}>Fulfillment</Text>
+            <Text style={styles.value}>{isPickup ? "Collect in store" : "Delivery"}</Text>
           </View>
         </View>
 
@@ -183,7 +193,7 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
             <Text style={styles.totalsValue}>{formatUSD(data.subtotal)}</Text>
           </View>
           <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Delivery Fee</Text>
+            <Text style={styles.totalsLabel}>{isPickup ? "Collection" : "Delivery Fee"}</Text>
             <Text style={styles.totalsValue}>{data.deliveryFee > 0 ? formatUSD(data.deliveryFee) : "Free"}</Text>
           </View>
           {data.discount > 0 && (

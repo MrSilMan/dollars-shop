@@ -103,6 +103,7 @@ export function ProductForm({ categories: initialCategories, defaultValues, prod
       lowStockAlert: 10,
       tags: [],
       images: [],
+      additionalCategoryIds: [],
       ...defaultValues,
     },
   });
@@ -111,6 +112,7 @@ export function ProductForm({ categories: initialCategories, defaultValues, prod
   const isActive   = watch("isActive");
   const isFeatured = watch("featured");
   const categoryId = watch("categoryId");
+  const additionalCategoryIds = watch("additionalCategoryIds") ?? [];
 
   useEffect(() => {
     if (!categoryId || skuEdited) return;
@@ -214,6 +216,14 @@ export function ProductForm({ categories: initialCategories, defaultValues, prod
     setAddingCategory(false);
     setNewCategoryName("");
     setCategoryError(null);
+  };
+
+  const addAdditionalCategory = (id: string) => {
+    if (!id || id === categoryId || additionalCategoryIds.includes(id)) return;
+    setValue("additionalCategoryIds", [...additionalCategoryIds, id], { shouldDirty: true });
+  };
+  const removeAdditionalCategory = (id: string) => {
+    setValue("additionalCategoryIds", additionalCategoryIds.filter(cid => cid !== id), { shouldDirty: true });
   };
 
   const addVariant = () => setVariants(prev => [...prev, { ...emptyVariant(), sortOrder: prev.length }]);
@@ -455,6 +465,53 @@ export function ProductForm({ categories: initialCategories, defaultValues, prod
                   {categoryError && <FieldError message={categoryError} />}
                   {!categoryError && <FieldError message={errors.categoryId?.message} />}
                 </div>
+              </div>
+
+              {/* Additional categories (many-to-many) */}
+              <div>
+                <label className={label}>
+                  Also in <span className="text-(--color-text-muted) font-normal text-xs">— optional, shows in these categories too</span>
+                </label>
+                {(() => {
+                  const byId = new Map(categories.map(c => [c.id, c]));
+                  const available = categories.filter(c => c.id !== categoryId && !additionalCategoryIds.includes(c.id));
+                  return (
+                    <>
+                      {additionalCategoryIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {additionalCategoryIds.map(id => {
+                            const cat = byId.get(id);
+                            if (!cat) return null;
+                            return (
+                              <span key={id} className="inline-flex items-center gap-1 rounded-full bg-(--color-primary-light) text-(--color-primary) text-xs font-medium pl-2.5 pr-1 py-1">
+                                {cat.name}
+                                <button
+                                  type="button"
+                                  onClick={() => removeAdditionalCategory(id)}
+                                  aria-label={`Remove ${cat.name}`}
+                                  className="flex items-center justify-center rounded-full hover:bg-(--color-primary)/20 w-4 h-4"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <select
+                        value=""
+                        onChange={e => { addAdditionalCategory(e.target.value); e.target.value = ""; }}
+                        disabled={available.length === 0}
+                        className={`${input} cursor-pointer disabled:opacity-60`}
+                      >
+                        <option value="">
+                          {available.length === 0 ? "No more categories to add" : "Add a category…"}
+                        </option>
+                        {available.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </Card>

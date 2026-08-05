@@ -1,20 +1,27 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppText, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/notifications/whatsapp";
 import { getAllCategories, getProductsByCategory, searchProducts } from "@/actions/products";
-import { CheckoutContactSchema, CheckoutAddressSchema } from "@/schemas/checkout.schema";
+import { CheckoutContactSchema, AddressLine1Schema, AddressCitySchema, ProvinceEnum } from "@/schemas/checkout.schema";
 import { getSession, saveSession, resetSession, type BotSession, type CheckoutDraft } from "./session";
 import { getBotCartItems, addToBotCart, clearBotCart, botCartTotal } from "./cart";
 import { createBotOrder, findOrderForTracking, type CompleteCheckoutDraft } from "./order";
 import { handleAdminMessage } from "./admin";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
+import { DELIVERY_FEE_USD, FREE_DELIVERY_THRESHOLD_USD, DELIVERY_AREA_LABEL } from "@/lib/delivery";
+import { isInnBucksEnabled } from "@/lib/payments/providers";
 
 export type IncomingMessage =
   | { kind: "text"; text: string }
   | { kind: "selection"; id: string; title: string };
 
 const RESET_WORDS = ["menu", "hi", "hello", "hey", "start", "cancel"];
-const PROVINCES = CheckoutAddressSchema.shape.province.options;
+const PROVINCES = ProvinceEnum.options;
 const PAYMENT_METHODS = ["ECOCASH", "INNBUCKS", "CASH_ON_DELIVERY"] as const;
 type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/** Mirrors checkout: never offer a provider we cannot actually charge. */
+const availablePaymentMethods = (): readonly PaymentMethod[] =>
+  PAYMENT_METHODS.filter((m) => m !== "INNBUCKS" || isInnBucksEnabled());
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -94,10 +101,12 @@ async function handleSelection(phone: string, id: string) {
       if (value === "checkout") return startCheckout(phone);
       if (value === "clear") return handleClearCart(phone);
       return showMainMenu(phone);
+    case "fulfil":
+      return handleFulfillmentSelection(phone, value);
     case "province":
       return handleProvinceSelection(phone, value);
     case "pay":
-      if ((PAYMENT_METHODS as readonly string[]).includes(value)) {
+      if ((availablePaymentMethods() as readonly string[]).includes(value)) {
         return handlePaymentMethodSelection(phone, value as PaymentMethod);
       }
       return showMainMenu(phone);
@@ -290,7 +299,11 @@ async function showCart(phone: string) {
   const lines = items.map(
     (item) => `• ${item.quantity} × ${item.product.name} — ${money(Number(item.product.price) * item.quantity)}`
   );
-  lines.push("", `Subtotal: *${money(subtotal)}*`, "_Delivery fee is calculated at checkout._");
+  lines.push(
+    "",
+    `Subtotal: *${money(subtotal)}*`,
+    `_Delivery is $${DELIVERY_FEE_USD} in ${DELIVERY_AREA_LABEL}, free over $${FREE_DELIVERY_THRESHOLD_USD} — or collect free in store._`
+  );
 
   await saveSession(phone, { state: "MAIN_MENU" });
   await sendWhatsAppButtons(phone, lines.join("\n"), [
@@ -345,12 +358,55 @@ async function handleCheckoutPhone(phone: string, session: BotSession, text: str
     await sendWhatsAppText(phone, "Please enter a valid Zimbabwean mobile number, e.g. 0772566468.");
     return;
   }
-  await saveSession(phone, { ...session, state: "CHECKOUT_ADDRESS_LINE1", checkout: { ...session.checkout, phone: result.data } });
+  await saveSession(phone, { ...session, state: "CHECKOUT_FULFILLMENT", checkout: { ...session.checkout, phone: result.data } });
+  await sendWhatsAppButtons(
+    phone,
+    `How would you like to get your order?\n\n🚚 Delivery — $${DELIVERY_FEE_USD} in ${DELIVERY_AREA_LABEL}, free over $${FREE_DELIVERY_THRESHOLD_USD}\n🏬 Collect in store — always free`,
+    [
+      { id: "fulfil:DELIVERY", title: "Deliver to me" },
+      { id: "fulfil:PICKUP", title: "Collect in store" },
+    ]
+  );
+}
+
+async function handleFulfillmentSelection(phone: string, value: string) {
+  const session = await getSession(phone);
+  if (session.state !== "CHECKOUT_FULFILLMENT") return showMainMenu(phone);
+  if (value !== "DELIVERY" && value !== "PICKUP") return showMainMenu(phone);
+
+  const checkout: CheckoutDraft = { ...session.checkout, fulfillmentType: value };
+
+  if (value === "PICKUP") {
+    await sendWhatsAppText(
+      phone,
+      `🏬 Great — collect at *${STORE_PICKUP_LOCATION.name}*\n` +
+        `${STORE_PICKUP_LOCATION.line1}, ${STORE_PICKUP_LOCATION.city}\n` +
+        `Open ${STORE_PICKUP_LOCATION.hours}\n\n` +
+        `Collection is free. We'll message you when your order is ready.`
+    );
+    await saveSession(phone, { ...session, state: "CHECKOUT_PAYMENT_METHOD", checkout });
+    return askPaymentMethod(phone, true);
+  }
+
+  await saveSession(phone, { ...session, state: "CHECKOUT_ADDRESS_LINE1", checkout });
   await sendWhatsAppText(phone, "What's your delivery address — street/house number and area?");
 }
 
+async function askPaymentMethod(phone: string, isPickup: boolean) {
+  const titles: Record<PaymentMethod, string> = {
+    ECOCASH: "EcoCash",
+    INNBUCKS: "InnBucks",
+    CASH_ON_DELIVERY: isPickup ? "Cash on collection" : "Cash on delivery",
+  };
+  await sendWhatsAppButtons(
+    phone,
+    "How would you like to pay?",
+    availablePaymentMethods().map((m) => ({ id: `pay:${m}`, title: titles[m] }))
+  );
+}
+
 async function handleCheckoutLine1(phone: string, session: BotSession, text: string) {
-  const result = CheckoutAddressSchema.shape.line1.safeParse(text);
+  const result = AddressLine1Schema.safeParse(text);
   if (!result.success) {
     await sendWhatsAppText(phone, "Please enter a more complete address (at least 5 characters).");
     return;
@@ -366,7 +422,7 @@ async function handleCheckoutLine2(phone: string, session: BotSession, text: str
 }
 
 async function handleCheckoutCity(phone: string, session: BotSession, text: string) {
-  const result = CheckoutAddressSchema.shape.city.safeParse(text);
+  const result = AddressCitySchema.safeParse(text);
   if (!result.success) {
     await sendWhatsAppText(phone, "Please enter a valid city/town name.");
     return;
@@ -385,11 +441,7 @@ async function handleProvinceSelection(phone: string, value: string) {
   if (!province) return showMainMenu(phone);
 
   await saveSession(phone, { ...session, state: "CHECKOUT_PAYMENT_METHOD", checkout: { ...session.checkout, province } });
-  await sendWhatsAppButtons(phone, "How would you like to pay?", [
-    { id: "pay:ECOCASH", title: "EcoCash" },
-    { id: "pay:INNBUCKS", title: "InnBucks" },
-    { id: "pay:CASH_ON_DELIVERY", title: "Cash on delivery" },
-  ]);
+  await askPaymentMethod(phone, false);
 }
 
 async function handlePaymentMethodSelection(phone: string, method: PaymentMethod) {
@@ -420,7 +472,10 @@ async function handleCheckoutPaymentNumber(phone: string, session: BotSession, t
 }
 
 function isCompleteDraft(draft: CheckoutDraft | undefined): draft is CompleteCheckoutDraft {
-  return !!draft && !!draft.name && !!draft.email && !!draft.phone && !!draft.line1 && !!draft.city && !!draft.province && !!draft.method;
+  if (!draft || !draft.name || !draft.email || !draft.phone || !draft.method) return false;
+  // Pickup orders are collected in store, so they carry no customer address.
+  if (draft.fulfillmentType === "PICKUP") return true;
+  return !!draft.line1 && !!draft.city && !!draft.province;
 }
 
 async function finishCheckout(phone: string, session: BotSession) {
@@ -459,7 +514,17 @@ async function finishCheckout(phone: string, session: BotSession) {
     await sendWhatsAppText(
       phone,
       `✅ Order *${result.orderNumber}* placed!\n\n` +
-        `💵 Pay *${money(payment.amount)}* in cash when your order is delivered. Thanks for shopping with Dollar Shop!`
+        (draft.fulfillmentType === "PICKUP"
+          ? `💵 Pay *${money(payment.amount)}* in cash when you collect at ${STORE_PICKUP_LOCATION.name}. Thanks for shopping with Dollar Shop!`
+          : `💵 Pay *${money(payment.amount)}* in cash when your order is delivered. Thanks for shopping with Dollar Shop!`)
+    );
+  }
+
+  if (draft.fulfillmentType === "PICKUP") {
+    await sendWhatsAppText(
+      phone,
+      `🏬 Collect at *${STORE_PICKUP_LOCATION.name}* — ${STORE_PICKUP_LOCATION.line1}, ${STORE_PICKUP_LOCATION.city}\n` +
+        `Open ${STORE_PICKUP_LOCATION.hours}. Bring order *${result.orderNumber}* and an ID.`
     );
   }
 

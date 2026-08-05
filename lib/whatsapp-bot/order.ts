@@ -6,11 +6,13 @@ import { getBotCartItems, clearBotCart, botCartTotal } from "./cart";
 import type { CheckoutDraft } from "./session";
 import { sendOrderConfirmationEmail, type OrderEmailData } from "@/lib/email";
 import { generateReceiptPdf, resolveReceiptBranding, type ReceiptData } from "@/lib/pdf/receipt";
+import { STORE_PICKUP_LOCATION } from "@/lib/store-location";
+import { calculateDeliveryFee } from "@/lib/delivery";
 
-export type CompleteCheckoutDraft = Required<
-  Pick<CheckoutDraft, "name" | "email" | "phone" | "line1" | "city" | "province" | "method">
-> &
-  Pick<CheckoutDraft, "line2" | "paymentNumber">;
+// Address fields are only present on DELIVERY drafts — a PICKUP order is
+// collected at the shop, so the store's own address is stored instead.
+export type CompleteCheckoutDraft = Required<Pick<CheckoutDraft, "name" | "email" | "phone" | "method">> &
+  Pick<CheckoutDraft, "line1" | "line2" | "city" | "province" | "paymentNumber" | "fulfillmentType">;
 
 export type BotOrderResult =
   | { success: true; orderNumber: string; payment: PaymentInitResult }
@@ -27,12 +29,28 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
   const cartItems = await getBotCartItems(waPhone);
   if (cartItems.length === 0) return { success: false, error: "Your cart is empty" };
 
-  const DELIVERY_FEE = parseFloat(process.env.DELIVERY_FEE_USD ?? "3.00");
-  const FREE_THRESHOLD = parseFloat(process.env.FREE_DELIVERY_THRESHOLD_USD ?? "15.00");
+  const fulfillmentType = draft.fulfillmentType ?? "DELIVERY";
+  const isPickup = fulfillmentType === "PICKUP";
 
   const subtotal = botCartTotal(cartItems);
-  const deliveryFee = subtotal >= FREE_THRESHOLD ? 0 : DELIVERY_FEE;
+  const deliveryFee = calculateDeliveryFee(subtotal, isPickup);
   const total = Math.max(0, subtotal + deliveryFee);
+
+  const orderAddress = isPickup
+    ? {
+        line1: STORE_PICKUP_LOCATION.line1,
+        line2: null,
+        city: STORE_PICKUP_LOCATION.city,
+        province: STORE_PICKUP_LOCATION.province,
+        country: STORE_PICKUP_LOCATION.country,
+      }
+    : {
+        line1: draft.line1 ?? "",
+        line2: draft.line2 ?? null,
+        city: draft.city ?? "",
+        province: draft.province ?? "",
+        country: "Zimbabwe",
+      };
 
   try {
     const orderNumber = generateOrderNumber();
@@ -44,6 +62,7 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
           guestEmail: draft.email,
           guestPhone: draft.phone,
           paymentMethod: draft.method,
+          fulfillmentType,
           status: "PENDING",
           paymentStatus: "UNPAID",
           subtotal,
@@ -54,11 +73,7 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
             name: draft.name,
             email: draft.email,
             phone: draft.phone,
-            line1: draft.line1,
-            line2: draft.line2 ?? null,
-            city: draft.city,
-            province: draft.province,
-            country: "Zimbabwe",
+            ...orderAddress,
           },
           items: {
             create: cartItems.map((item) => ({
@@ -113,6 +128,7 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
             orderNumber,
             createdAt: order.createdAt,
             paymentMethod: draft.method,
+            fulfillmentType,
             customerName: draft.name,
             customerPhone: draft.phone,
             items,
@@ -120,13 +136,7 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
             deliveryFee,
             discount: 0,
             total,
-            shippingAddress: {
-              line1: draft.line1,
-              line2: draft.line2,
-              city: draft.city,
-              province: draft.province,
-              country: "Zimbabwe",
-            },
+            shippingAddress: orderAddress,
             ...branding,
           };
           return generateReceiptPdf(receiptData);
@@ -142,7 +152,8 @@ export async function createBotOrder(waPhone: string, draft: CompleteCheckoutDra
             discount: 0,
             total,
             paymentMethod: draft.method,
-            shippingAddress: { line1: draft.line1, line2: draft.line2, city: draft.city, province: draft.province },
+            fulfillmentType,
+            shippingAddress: orderAddress,
             receiptPdf,
           };
           return sendOrderConfirmationEmail(emailData);

@@ -25,11 +25,13 @@ interface Order {
   deliveryFee: number;
   discount: number;
   couponCode?: string | null;
+  fulfillmentType?: string;
   shippingAddress: Record<string, string>;
   createdAt: Date;
   items: OrderItem[];
   user?: { name?: string | null; email: string } | null;
   guestEmail?: string | null;
+  payment?: { currency: string; amount: number; exchangeRate: number | null } | null;
 }
 
 export function OrdersClient({ orders }: { orders: Order[] }) {
