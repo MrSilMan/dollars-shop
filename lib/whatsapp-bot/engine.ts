@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppText, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/notifications/whatsapp";
 import { getAllCategories, getProductsByCategory, searchProducts } from "@/actions/products";
-import { CheckoutContactSchema, AddressLine1Schema, AddressCitySchema, ProvinceEnum } from "@/schemas/checkout.schema";
+import { CheckoutContactSchema, ZWPhoneSchema, AddressLine1Schema, AddressCitySchema, ProvinceEnum } from "@/schemas/checkout.schema";
 import { getSession, saveSession, resetSession, type BotSession, type CheckoutDraft } from "./session";
 import { getBotCartItems, addToBotCart, clearBotCart, botCartTotal } from "./cart";
 import { createBotOrder, findOrderForTracking, type CompleteCheckoutDraft } from "./order";
@@ -349,13 +349,13 @@ async function handleCheckoutEmail(phone: string, session: BotSession, text: str
     return;
   }
   await saveSession(phone, { ...session, state: "CHECKOUT_PHONE", checkout: { ...session.checkout, email: result.data } });
-  await sendWhatsAppText(phone, "And a contact phone number for delivery? (07XXXXXXXX)");
+  await sendWhatsAppText(phone, "And a contact phone number for delivery? (07XXXXXXXX — or start with your country code, like +XX, if you're outside Zimbabwe)");
 }
 
 async function handleCheckoutPhone(phone: string, session: BotSession, text: string) {
   const result = CheckoutContactSchema.shape.phone.safeParse(text.replace(/\s+/g, ""));
   if (!result.success) {
-    await sendWhatsAppText(phone, "Please enter a valid Zimbabwean mobile number, e.g. 0772566468.");
+    await sendWhatsAppText(phone, "Please enter a valid mobile number, e.g. 07XXXXXXXX — or include your country code, starting with +, if you're outside Zimbabwe.");
     return;
   }
   await saveSession(phone, { ...session, state: "CHECKOUT_FULFILLMENT", checkout: { ...session.checkout, phone: result.data } });
@@ -461,8 +461,10 @@ async function handlePaymentMethodSelection(phone: string, method: PaymentMethod
   );
 }
 
+// Not the contact schema: this number is charged, so it stays Zimbabwe-only
+// even though the contact number above no longer is.
 async function handleCheckoutPaymentNumber(phone: string, session: BotSession, text: string) {
-  const result = CheckoutContactSchema.shape.phone.safeParse(text.replace(/\s+/g, ""));
+  const result = ZWPhoneSchema.safeParse(text.replace(/\s+/g, ""));
   if (!result.success) {
     await sendWhatsAppText(phone, "Please enter a valid Zimbabwean mobile number, e.g. 0772566468.");
     return;

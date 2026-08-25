@@ -16,6 +16,7 @@ interface NavbarProps {
 
 const categoryLinks = [
   { href: "/shop",                      label: "All Products" },
+  { href: "/categories",                label: "All Categories" },
   { href: "/shop/school-stationery",    label: "School Stationery" },
   { href: "/shop/hardware",             label: "Hardware" },
   { href: "/shop/baby-necessities",     label: "Baby Necessities" },

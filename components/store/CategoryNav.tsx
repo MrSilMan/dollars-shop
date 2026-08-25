@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useCallback, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import { CategoryImage } from "@/components/store/CategoryImage";
 
 interface Category {
@@ -76,6 +76,11 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
             </Link>
           );
         })}
+        {/* Escape hatch out of the strip — the full grid at /categories. */}
+        <Link href="/categories" className={`${pillBase} ${pillIdle}`}>
+          <LayoutGrid size={14} className="text-(--color-primary)" />
+          All Categories
+        </Link>
       </nav>
 
       <button type="button" onClick={() => scroll("right")} aria-label="Scroll categories right" className={navBtn}>

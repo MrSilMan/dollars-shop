@@ -15,7 +15,7 @@ export function BottomNav({ isAuthenticated = false }: BottomNavProps) {
 
   const tabs = [
     { href: "/",                    label: "Home",       icon: Home,         highlight: false, badge: 0 },
-    { href: "/shop",                label: "Categories", icon: LayoutGrid,   highlight: false, badge: 0 },
+    { href: "/categories",          label: "Categories", icon: LayoutGrid,   highlight: false, badge: 0 },
     { href: "/cart",                label: "Cart",       icon: ShoppingCart, highlight: true,  badge: cartCount },
     { href: "/account/wishlist",    label: "Wishlist",   icon: Heart,        highlight: false, badge: wishlistCount },
     {

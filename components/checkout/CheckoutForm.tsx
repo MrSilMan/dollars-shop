@@ -278,6 +278,9 @@ export function CheckoutForm({
                   <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
                   <input {...form.register("phone")} type="tel" placeholder="07X XXXXXXX" className={iconInputCls} />
                 </div>
+                <p className="text-xs text-(--color-text-muted)">
+                  Ordering from outside Zimbabwe? Include your country code, starting with +.
+                </p>
               </Field>
             </div>
           )}
@@ -440,7 +443,7 @@ export function CheckoutForm({
                     color="blue"
                   >
                     {w.method === "INNBUCKS" && (
-                      <Field label="InnBucks Number (optional)">
+                      <Field label="InnBucks Number (optional)" error={form.formState.errors.innbucksNumber?.message}>
                         <div className="relative">
                           <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--color-text-muted) pointer-events-none" />
                           <input {...form.register("innbucksNumber")} type="tel" placeholder="077XXXXXXX" className={iconInputCls} />

@@ -67,6 +67,7 @@ export function Footer({
           <ul className="space-y-2.5 text-sm text-white/70">
             {[
               { href: "/shop",                      label: "All Products" },
+              { href: "/categories",                label: "All Categories" },
               { href: "/shop/school-stationery",    label: "School Stationery" },
               { href: "/shop/daily-necessities",    label: "Daily Necessities" },
               { href: "/shop/baby-necessities",     label: "Baby Necessities" },

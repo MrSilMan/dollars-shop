@@ -194,7 +194,7 @@ export function HeroSection({
             );
           })}
           <Link
-            href="/shop"
+            href="/categories"
             className="group flex items-center gap-2.5 px-3 py-2.5 hover:bg-(--color-primary-light) transition-colors duration-150 mt-auto"
           >
             <span className="w-5 h-5 flex items-center justify-center shrink-0 text-(--color-primary)">

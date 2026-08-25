@@ -144,7 +144,7 @@ export default async function HomePage({
               );
             })}
             <Link
-              href="/shop"
+              href="/categories"
               className="flex flex-col items-center gap-1.5 p-1 lg:p-2 rounded-xl hover:bg-(--color-primary-light) transition-colors duration-150 group"
             >
               <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 rounded-2xl border-2 border-dashed border-(--color-primary) flex items-center justify-center transition-all duration-150 group-hover:scale-110 group-hover:bg-(--color-primary-light)">

@@ -20,6 +20,9 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
   PRODUCT_CREATE:      { label: "Created product",           color: "bg-blue-50 text-blue-700 border-blue-100" },
   PRODUCT_UPDATE:      { label: "Updated product",           color: "bg-blue-50 text-blue-700 border-blue-100" },
   PRODUCT_DELETE:      { label: "Archived product",          color: "bg-blue-50 text-blue-700 border-blue-100" },
+  CATEGORY_CREATE:     { label: "Created category",          color: "bg-sky-50 text-sky-700 border-sky-100" },
+  CATEGORY_UPDATE:     { label: "Updated category",          color: "bg-sky-50 text-sky-700 border-sky-100" },
+  CATEGORY_DELETE:     { label: "Deleted category",          color: "bg-sky-50 text-sky-700 border-sky-100" },
   ORDER_STATUS_UPDATE: { label: "Updated order status",      color: "bg-green-50 text-green-700 border-green-100" },
   ORDER_COD_PAYMENT:   { label: "COD payment received",      color: "bg-green-50 text-green-700 border-green-100" },
   COUPON_CREATE:       { label: "Created coupon",            color: "bg-amber-50 text-amber-700 border-amber-100" },
@@ -33,6 +36,7 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
 const ACTION_GROUPS = [
   { label: "All actions",  value: "" },
   { label: "Products",     value: "PRODUCT" },
+  { label: "Categories",   value: "CATEGORY" },
   { label: "Orders",       value: "ORDER" },
   { label: "Coupons",      value: "COUPON" },
   { label: "Staff",        value: "STAFF" },

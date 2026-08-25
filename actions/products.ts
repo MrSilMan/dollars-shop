@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ProductSchema, type ProductFormData } from "@/schemas/product.schema";
 import { canAccess } from "@/lib/permissions";
-import { getCached, setCached, invalidateProductCache } from "@/lib/redis";
+import { getCached, setCached, invalidateProductCache, invalidateCategoryCache } from "@/lib/redis";
 import { logAudit } from "@/lib/audit";
 
 async function withCache<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T> {
@@ -232,26 +232,73 @@ export async function getAllCategories() {
 }
 
 /**
+ * categoryId → how many active products the category lists, counted the same way
+ * getProductsByCategory paginates: primary category OR additional (many-to-many)
+ * category, each product counted once. Cached because it scans products.
+ */
+async function computeCategoryProductCounts(): Promise<Record<string, number>> {
+  const [primary, extras] = await Promise.all([
+    prisma.product.groupBy({
+      by: ["categoryId"],
+      where: { isActive: true },
+      _count: { _all: true },
+    }),
+    // Only each linked product's primary categoryId comes back, which is all
+    // it takes to drop the ones already counted above.
+    prisma.category.findMany({
+      select: { id: true, extraProducts: { where: { isActive: true }, select: { categoryId: true } } },
+    }),
+  ]);
+
+  const counts: Record<string, number> = Object.fromEntries(
+    primary.map((g) => [g.categoryId, g._count._all])
+  );
+  for (const c of extras) {
+    const extra = c.extraProducts.filter((p) => p.categoryId !== c.id).length;
+    if (extra > 0) counts[c.id] = (counts[c.id] ?? 0) + extra;
+  }
+  return counts;
+}
+
+/** The cached view of the above, for storefront traffic. */
+async function getCategoryProductCounts(): Promise<Record<string, number>> {
+  return withCache("categories:counts", 1800, computeCategoryProductCounts);
+}
+
+/**
+ * The storefront category index: every visible category with its display image
+ * and product count, in the admin's order. Same shape as getAllCategories plus
+ * `productCount`, so /categories can say how much sits behind each card.
+ */
+export async function getCategoriesWithCounts() {
+  const [categories, counts] = await Promise.all([getAllCategories(), getCategoryProductCounts()]);
+  return categories.map((c) => ({ ...c, productCount: counts[c.id] ?? 0 }));
+}
+
+/**
  * Every category — hidden ones included — with the two images that matter to the
  * admin: `imageUrl` is the pinned upload, `fallbackImage` is the product photo the
  * storefront shows in its absence. Both are returned so the UI can say which is live.
  */
 export async function getCategoriesForAdmin() {
-  const [categories, fallbacks] = await Promise.all([
+  const [categories, fallbacks, counts] = await Promise.all([
     prisma.category.findMany({
       // Name breaks the tie: 7 categories share sortOrder 0, and without it the
       // admin list reshuffles on every refresh.
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      include: { _count: { select: { products: { where: { isActive: true } } } } },
     }),
     getCategoryImageFallbacks(),
+    // Uncached, and the same rule the storefront counts by — the admin has just
+    // edited something, and the two pages must not disagree about the totals.
+    computeCategoryProductCounts(),
   ]);
   return categories.map((c) => ({
     id: c.id,
     name: c.name,
     slug: c.slug,
+    description: c.description,
     isActive: c.isActive,
-    productCount: c._count.products,
+    productCount: counts[c.id] ?? 0,
     imageUrl: c.imageUrl,
     fallbackImage: fallbacks[c.id] ?? null,
   }));
@@ -311,7 +358,35 @@ export async function updateCategoryImage(id: string, imageUrl: string | null) {
   return { success: true };
 }
 
-export async function createCategory(name: string) {
+/** Category names → URL slugs. Shared so a rename and a create can't disagree. */
+function slugifyCategory(value: string) {
+  return value.trim().toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Refresh every page a category edit can touch: its own listing (both slugs on a
+ * rename), the two indexes, and the homepage rails.
+ */
+function revalidateCategoryPaths(...slugs: (string | null | undefined)[]) {
+  revalidatePath("/");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  for (const slug of new Set(slugs.filter((s): s is string => Boolean(s)))) {
+    revalidatePath(`/shop/${slug}`);
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/new");
+}
+
+export async function createCategory(
+  name: string,
+  options?: { description?: string | null; isActive?: boolean }
+) {
   const session = await auth();
   const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
   if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
@@ -319,22 +394,112 @@ export async function createCategory(name: string) {
   const trimmed = name.trim();
   if (!trimmed) return { error: "Category name is required" };
 
-  const slug = trimmed.toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+  const slug = slugifyCategory(trimmed);
   if (!slug) return { error: "Category name is required" };
 
   const existing = await prisma.category.findUnique({ where: { slug } });
-  if (existing) return existing.isActive ? { error: "Category already exists" } : { error: "A deleted category with this name already exists" };
+  if (existing) return existing.isActive ? { error: "Category already exists" } : { error: "A hidden category with this name already exists — show it instead" };
 
-  const category = await prisma.category.create({ data: { name: trimmed, slug } });
+  // Land it at the end of the storefront order rather than at the top, which is
+  // where a default sortOrder of 0 would put it.
+  const last = await prisma.category.findFirst({ orderBy: { sortOrder: "desc" }, select: { sortOrder: true } });
+
+  const category = await prisma.category.create({
+    data: {
+      name: trimmed,
+      slug,
+      description: options?.description?.trim() || null,
+      isActive: options?.isActive ?? true,
+      sortOrder: (last?.sortOrder ?? -1) + 1,
+    },
+  });
 
   logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "CATEGORY_CREATE", entity: "category", entityId: category.id, entityLabel: category.name });
 
-  revalidatePath("/admin/products");
-  revalidatePath("/admin/products/new");
+  await invalidateCategoryCache([slug]);
+  revalidateCategoryPaths(slug);
   return { success: true, category };
+}
+
+/**
+ * Edit a category's name, URL, description or visibility. Every field is
+ * optional — the admin row sends only what changed (a visibility toggle sends
+ * `isActive` alone).
+ */
+export async function updateCategory(
+  id: string,
+  data: { name?: string; slug?: string; description?: string | null; isActive?: boolean }
+) {
+  const session = await auth();
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
+
+  const current = await prisma.category.findUnique({ where: { id } });
+  if (!current) return { error: "Category not found" };
+
+  const name = data.name === undefined ? undefined : data.name.trim();
+  if (name !== undefined && !name) return { error: "Category name is required" };
+
+  let slug: string | undefined;
+  if (data.slug !== undefined) {
+    slug = slugifyCategory(data.slug);
+    if (!slug) return { error: "The URL needs at least one letter or number" };
+    if (slug !== current.slug) {
+      const clash = await prisma.category.findUnique({ where: { slug } });
+      if (clash) return { error: `Another category already uses /shop/${slug}` };
+    }
+  }
+
+  const category = await prisma.category.update({
+    where: { id },
+    data: {
+      ...(name !== undefined ? { name } : {}),
+      ...(slug !== undefined ? { slug } : {}),
+      ...(data.description !== undefined ? { description: data.description?.trim() || null } : {}),
+      ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+    },
+  });
+
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "CATEGORY_UPDATE", entity: "category", entityId: category.id, entityLabel: category.name });
+
+  await invalidateCategoryCache([current.slug, category.slug]);
+  revalidateCategoryPaths(current.slug, category.slug);
+  return { success: true, category };
+}
+
+/**
+ * Permanently remove an empty category. Products keep pointing at their category
+ * even once they're hidden, so anything still attached blocks the delete — the
+ * admin hides the category instead, which is what the storefront already honours.
+ */
+export async function deleteCategory(id: string) {
+  const session = await auth();
+  const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+  if (!session || !canAccess("products", user?.role ?? "")) return { error: "Unauthorized" };
+
+  const category = await prisma.category.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { products: true, extraProducts: true, children: true } },
+    },
+  });
+  if (!category) return { error: "Category not found" };
+
+  const attached = category._count.products + category._count.extraProducts;
+  if (attached > 0) {
+    return {
+      error: `${category.name} still has ${attached} product${attached === 1 ? "" : "s"} (hidden ones count). Move them to another category first, or hide this one instead.`,
+    };
+  }
+  if (category._count.children > 0) return { error: "Move this category's subcategories somewhere else first" };
+
+  await prisma.category.delete({ where: { id } });
+
+  logAudit({ actorId: user?.id, actorEmail: user?.email, actorRole: user?.role, action: "CATEGORY_DELETE", entity: "category", entityId: category.id, entityLabel: category.name });
+
+  await invalidateCategoryCache([category.slug]);
+  revalidateCategoryPaths(category.slug);
+  return { success: true };
 }
 
 export async function getProductVariants(productId: string) {

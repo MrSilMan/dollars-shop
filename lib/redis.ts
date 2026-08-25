@@ -27,11 +27,33 @@ async function scanKeys(pattern: string): Promise<string[]> {
 }
 
 export async function invalidateProductCache(productSlug: string, categorySlug?: string | string[]) {
-  // categories:images is derived from product photos, so it goes stale too.
-  const keys: string[] = [`product:${productSlug}`, "products:featured", "categories:images"];
+  // categories:images and categories:counts are derived from products, so they
+  // go stale too.
+  const keys: string[] = [
+    `product:${productSlug}`,
+    "products:featured",
+    "categories:images",
+    "categories:counts",
+  ];
 
   const categorySlugs = Array.isArray(categorySlug) ? categorySlug : categorySlug ? [categorySlug] : [];
   for (const slug of new Set(categorySlugs)) {
+    const categoryKeys = await scanKeys(`products:category:${slug}:*`);
+    keys.push(...categoryKeys);
+  }
+
+  await Promise.all(keys.map((k) => redis.del(k)));
+}
+
+/**
+ * Drop what the storefront caches about categories themselves — the derived
+ * aggregates plus the paginated listing for each slug that changed. Renames
+ * pass both the old and new slug so neither listing survives the edit.
+ */
+export async function invalidateCategoryCache(categorySlugs: string[] = []) {
+  const keys: string[] = ["categories:images", "categories:counts"];
+
+  for (const slug of new Set(categorySlugs.filter(Boolean))) {
     const categoryKeys = await scanKeys(`products:category:${slug}:*`);
     keys.push(...categoryKeys);
   }

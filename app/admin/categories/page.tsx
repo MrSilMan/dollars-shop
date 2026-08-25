@@ -19,8 +19,9 @@ export default async function AdminCategoriesPage() {
       <div>
         <h1 className="font-display text-2xl font-bold text-(--color-text-primary)">Categories</h1>
         <p className="text-sm text-(--color-text-muted) mt-0.5">
-          Set the order categories appear in across the storefront, and pin the image each one shows.
-          Without a pinned image, a product photo from the category is used automatically.
+          Add categories, edit their name, URL and description, hide the ones you&apos;re not selling
+          right now, and set the order they appear in across the storefront. Pin an image to any
+          category — without one, a product photo from that category is used automatically.
         </p>
       </div>
       <CategoriesManager categories={categories} />
